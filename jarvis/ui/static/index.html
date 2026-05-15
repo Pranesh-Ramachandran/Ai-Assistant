@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JARVIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #F8FAFF;
+      --bg2:      #EEF2FA;
+      --border:   #DDE3F0;
+      --text:     #1A2540;
+      --sub:      #6B7A99;
+      --c-idle:      #94A3B8;
+      --c-listen:    #0284C7;
+      --c-think:     #7C3AED;
+      --c-speak:     #059669;
+      --c-error:     #DC2626;
+    }
+
+    html, body { width:100%; height:100%; font-family: 'Inter', system-ui, sans-serif;
+                 background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+
+    #app { display:flex; flex-direction:column; align-items:center;
+           height:100vh; padding:22px 20px 16px; }
+
+    header { width:100%; max-width:520px; display:flex; align-items:center;
+             justify-content:space-between; margin-bottom:4px; }
+    .logo  { font-size:12px; font-weight:600; letter-spacing:5px;
+             text-transform:uppercase; color:var(--accent,#0284C7); transition:color .6s; }
+    .pill  { display:flex; align-items:center; gap:6px;
+             font-size:10px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase;
+             padding:5px 13px; border-radius:20px; border:1px solid var(--border);
+             background:#fff; color:var(--sub); transition:all .5s; }
+    .dot   { width:6px; height:6px; border-radius:50%;
+             background:var(--c-idle); transition:background .5s, box-shadow .5s; }
+
+    #wrap  { flex:1; display:flex; flex-direction:column; align-items:center;
+             justify-content:center; width:100%; max-width:520px; gap:10px; }
+    #cv    { display:block; }
+
+    #sub-lbl { font-size:11px; font-weight:400; color:var(--sub);
+               letter-spacing:.3px; min-height:16px; transition:color .5s; }
+
+    #panel { width:100%; max-width:520px; display:flex; flex-direction:column; gap:10px; }
+
+    .tabs  { display:none; } /* hidden — state driven by Python, not manual tabs */
+
+    hr { border:none; border-top:1px solid var(--border); }
+
+    #log { display:flex; flex-direction:column; gap:4px;
+           max-height:80px; overflow-y:auto; scrollbar-width:none; }
+    #log::-webkit-scrollbar { display:none; }
+    .msg { font-size:12px; padding:4px 10px; border-radius:8px;
+           max-width:88%; animation:up .25s ease; }
+    @keyframes up { from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none} }
+    .msg.u { align-self:flex-end; background:var(--bg2); color:var(--text); font-weight:500; }
+    .msg.j { align-self:flex-start; background:#fff; color:var(--sub);
+             border:1px solid var(--border); }
+    .msg.j.loading { color:var(--sub); font-style:italic; }
+
+    .row { display:flex; gap:7px; align-items:center; }
+    #inp { flex:1; background:#fff; border:1px solid var(--border); border-radius:9px;
+           padding:9px 13px; font:14px 'Inter',sans-serif; color:var(--text); outline:none;
+           transition:border-color .2s, box-shadow .2s; }
+    #inp::placeholder { color:var(--sub); }
+    #inp:focus { border-color:var(--accent,#0284C7);
+                 box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,#0284C7) 12%,transparent); }
+    .ib { width:36px; height:36px; border-radius:9px; border:1px solid var(--border);
+          background:var(--bg2); color:var(--sub); font-size:14px; cursor:pointer;
+          display:flex; align-items:center; justify-content:center; transition:all .2s; flex-shrink:0; }
+    .ib:hover { border-color:var(--accent,#0284C7); color:var(--accent,#0284C7); }
+    #sb { background:var(--accent,#0284C7); color:#fff; border-color:var(--accent,#0284C7); }
+    #sb:hover { opacity:.88; }
+    #mb.rec { border-color:var(--c-listen); color:var(--c-listen);
+              animation:mb-pulse 1s ease-in-out infinite; }
+    @keyframes mb-pulse { 50%{box-shadow:0 0 0 5px color-mix(in srgb,var(--c-listen) 18%,transparent)} }
+
+    .frow { display:flex; align-items:center; justify-content:space-between; }
+    #abars { display:flex; align-items:flex-end; gap:2px; height:18px; }
+    .ab   { width:3px; border-radius:2px; background:var(--border); min-height:3px;
+            transition:height .09s, background .5s; }
+    #ftxt { font-size:10px; color:var(--sub); letter-spacing:.3px; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo" id="logo">Jarvis</div>
+    <div class="pill" id="pill"><div class="dot" id="pill-dot"></div><span id="pill-txt">Idle</span></div>
+  </header>
+
+  <div id="wrap">
+    <canvas id="cv"></canvas>
+    <div id="sub-lbl">Waiting for input</div>
+  </div>
+
+  <div id="panel">
+    <div id="log"></div>
+    <div class="row">
+      <input id="inp" type="text" placeholder="Ask Jarvis something…" autocomplete="off" />
+      <button class="ib" id="mb" title="Mic">🎙</button>
+      <button class="ib" id="sb" title="Send">↑</button>
+    </div>
+    <div class="frow">
+      <div id="abars">
+        <div class="ab" style="height:3px"></div><div class="ab" style="height:5px"></div>
+        <div class="ab" style="height:9px"></div><div class="ab" style="height:6px"></div>
+        <div class="ab" style="height:3px"></div><div class="ab" style="height:7px"></div>
+        <div class="ab" style="height:4px"></div><div class="ab" style="height:11px"></div>
+        <div class="ab" style="height:5px"></div><div class="ab" style="height:3px"></div>
+        <div class="ab" style="height:8px"></div><div class="ab" style="height:4px"></div>
+      </div>
+      <div id="ftxt">JARVIS · v3.0</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── API endpoint (Flask backend) ──────────────────────────────────────────────
+const API = 'http://localhost:5000';
+
+// ── State colours ─────────────────────────────────────────────────────────────
+const PAL = {
+  idle:      { r:.47, g:.54, b:.68, hex:'#94A3B8', name:'Idle',      sub:'Waiting for input',        pillBg:'#F8FAFF', pillFg:'#6B7A99' },
+  listening: { r:.01, g:.52, b:.78, hex:'#0284C7', name:'Listening', sub:'Capturing your voice…',    pillBg:'#F0F9FF', pillFg:'#0284C7' },
+  thinking:  { r:.48, g:.22, b:.93, hex:'#7C3AED', name:'Thinking',  sub:'Processing your request…', pillBg:'#F5F3FF', pillFg:'#7C3AED' },
+  speaking:  { r:.02, g:.59, b:.41, hex:'#059669', name:'Speaking',  sub:'Generating response…',     pillBg:'#ECFDF5', pillFg:'#059669' },
+  error:     { r:.86, g:.15, b:.15, hex:'#DC2626', name:'Error',     sub:'Something went wrong.',    pillBg:'#FFF5F5', pillFg:'#DC2626' },
+};
+
+// ── Grid setup ────────────────────────────────────────────────────────────────
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const wrap = document.getElementById('wrap');
+const COLS = 18, ROWS = 18;
+let dots = [];
+
+function initDots() {
+  dots = [];
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++)
+    dots.push({ r, c, phase: Math.random()*Math.PI*2, speed: .65+Math.random()*.7, glitch: 0, lastFire: -99 });
+}
+initDots();
+
+function resize() {
+  const sz = Math.min(wrap.clientWidth*.94, wrap.clientHeight*.9, 460);
+  cv.width = cv.height = sz;
+}
+resize(); window.addEventListener('resize', resize);
+
+// ── State machine ─────────────────────────────────────────────────────────────
+let curState = 'idle', tgtState = 'idle', blend = 1;
+let T = 0, amp = 0, simPhase = 0;
+let busy = false;
+
+function setState(s) {
+  if (s === tgtState) return;
+  curState = blend > .5 ? tgtState : curState;
+  tgtState = s; blend = 0;
+  updateUI(s);
+}
+
+function updateUI(s) {
+  const p = PAL[s];
+  document.documentElement.style.setProperty('--accent', p.hex);
+  document.getElementById('logo').style.color = p.hex;
+  const pill = document.getElementById('pill');
+  const dot  = document.getElementById('pill-dot');
+  pill.style.background  = p.pillBg;
+  pill.style.borderColor = p.hex+'44';
+  pill.style.color       = p.pillFg;
+  dot.style.background   = p.hex;
+  dot.style.boxShadow    = `0 0 0 3px ${p.hex}28`;
+  document.getElementById('pill-txt').textContent = p.name;
+  const lbl = document.getElementById('sub-lbl');
+  lbl.textContent = p.sub; lbl.style.color = p.hex;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.s === s));
+  const bc = s==='error'?'#DC2626':s==='thinking'?'#7C3AED':s==='speaking'?'#059669':s==='listening'?'#0284C7':'#DDE3F0';
+  document.querySelectorAll('.ab').forEach(b => b.style.background = bc);
+}
+
+// ── Colour helpers ────────────────────────────────────────────────────────────
+function lerp(a,b,f){return a+(b-a)*f;}
+function mixPal(a,b,f){return {r:lerp(a.r,b.r,f),g:lerp(a.g,b.g,f),b:lerp(a.b,b.b,f)};}
+function rgba(c,a){return `rgba(${(c.r*255)|0},${(c.g*255)|0},${(c.b*255)|0},${a.toFixed(3)})`;}
+
+// ── Animations ────────────────────────────────────────────────────────────────
+function aIdle(d,dist,angle,T,col){
+  const nx=d.c/(COLS-1)*2-1, ny=d.r/(ROWS-1)*2-1;
+  const sweep=Math.sin(T*.55+nx*2.5+ny*1);
+  const breath=Math.sin(T*.8*d.speed+d.phase)*.5+.5;
+  return {alpha:.28+.22*Math.max(0,sweep)+.08*breath, radius:1.0+.6*Math.max(0,sweep)+.3*breath};
+}
+function aListening(d,dist,angle,T,col,amp){
+  const colPhase=d.c*.45;
+  const bounce=Math.sin(T*5.5+colPhase+d.phase*.4)*.5+.5;
+  const wave=Math.sin(T*3.5-dist*6+d.phase*.3);
+  return {alpha:.28+.48*bounce*(1-dist*.5)+.22*Math.max(0,wave)+amp*.35, radius:.85+1.0*bounce*(1-dist*.3)+.4*Math.max(0,wave)+amp*.4};
+}
+function aThinking(d,dist,angle,T,col){
+  const s1=Math.sin(T*2.8-angle*3-dist*5+d.phase)*.5+.5;
+  const s2=Math.sin(T*2.0+angle*2-dist*4+d.phase)*.5+.5;
+  const fire=T-d.lastFire<.18?(1-(T-d.lastFire)/.18):0;
+  if(Math.random()<.003) d.lastFire=T;
+  const combined=Math.max(s1,s2*.6,fire);
+  const mix=dist*.5;
+  return {alpha:.22+.60*combined, radius:.75+1.1*combined,
+    cr:PAL.thinking.r*(1-mix)+PAL.listening.r*mix,
+    cg:PAL.thinking.g*(1-mix)+PAL.listening.g*mix,
+    cb:PAL.thinking.b*(1-mix)+PAL.listening.b*mix};
+}
+function aSpeaking(d,dist,angle,T,col,amp){
+  const r1=Math.sin(T*6.5-dist*9)*.5+.5;
+  const r2=Math.sin(T*6.5-dist*9-2.1)*.5+.5;
+  const r3=Math.sin(T*6.5-dist*9-4.2)*.5+.5;
+  const ring=Math.max(r1,r2,r3);
+  return {alpha:.25+.55*ring+amp*.30, radius:.80+1.15*ring+amp*.45};
+}
+function aError(d,dist,angle,T,col){
+  d.glitch=d.glitch*.88+(Math.random()<.015?Math.random():0)*.15;
+  const broken=Math.sin(T*5.5+d.phase*2.4)*(1-dist*.6);
+  return {alpha:.15+.38*Math.max(0,broken)+d.glitch*1.1, radius:.6+.8*Math.max(0,broken)+d.glitch*1.3,
+    cr:col.r, cg:col.g*(1-d.glitch*.75), cb:col.b*(1-d.glitch)};
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────────
+function drawGrid(state,T,amp){
+  const W=cv.width, H=cv.height, cx=W/2, cy=H/2;
+  const gw=W*.82, stepX=gw/(COLS-1), stepY=gw/(ROWS-1);
+  const ox=cx-gw/2, oy=cy-gw/2, baseR=W/110;
+  const col=mixPal(PAL[curState],PAL[tgtState],blend);
+
+  for(const d of dots){
+    const px=ox+d.c*stepX, py=oy+d.r*stepY;
+    const dx=(px-cx)/(gw/2), dy=(py-cy)/(gw/2);
+    const dist=Math.hypot(dx,dy), angle=Math.atan2(dy,dx);
+    if(dist>1.0) continue;
+
+    const res=state==='idle'?aIdle(d,dist,angle,T,col)
+      :state==='listening'?aListening(d,dist,angle,T,col,amp)
+      :state==='thinking'?aThinking(d,dist,angle,T,col)
+      :state==='speaking'?aSpeaking(d,dist,angle,T,col,amp)
+      :aError(d,dist,angle,T,col);
+
+    const alpha=Math.max(0,Math.min(1,res.alpha));
+    const radius=Math.max(.2,res.radius)*baseR;
+    const cr=res.cr!==undefined?res.cr:col.r;
+    const cg=res.cg!==undefined?res.cg:col.g;
+    const cb=res.cb!==undefined?res.cb:col.b;
+    if(alpha<.01) continue;
+
+    const g=ctx.createRadialGradient(px,py,0,px,py,radius*4);
+    g.addColorStop(0,rgba({r:cr,g:cg,b:cb},alpha*.65));
+    g.addColorStop(.45,rgba({r:cr,g:cg,b:cb},alpha*.12));
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(px,py,radius*4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=rgba({r:cr,g:cg,b:cb},Math.min(1,alpha*2.4));
+    ctx.beginPath(); ctx.arc(px,py,radius,0,Math.PI*2); ctx.fill();
+  }
+
+  if(state==='thinking'){
+    ctx.save();
+    for(let i=0;i<dots.length-1;i+=3){
+      const d1=dots[i], p1x=ox+d1.c*stepX, p1y=oy+d1.r*stepY;
+      if(Math.hypot((p1x-cx)/(gw/2),(p1y-cy)/(gw/2))>.90) continue;
+      for(let j=i+1;j<Math.min(i+12,dots.length);j++){
+        const d2=dots[j], p2x=ox+d2.c*stepX, p2y=oy+d2.r*stepY;
+        if(Math.hypot(p1x-p2x,p1y-p2y)>stepX*1.7) continue;
+        if(Math.hypot((p2x-cx)/(gw/2),(p2y-cy)/(gw/2))>.90) continue;
+        const pulse=(Math.sin(T*3+d1.phase-d2.phase)+1)*.5;
+        ctx.strokeStyle=rgba(col,.04+.14*pulse);
+        ctx.lineWidth=.8;
+        ctx.beginPath(); ctx.moveTo(p1x,p1y); ctx.lineTo(p2x,p2y); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+}
+
+// ── Audio sim + bars ──────────────────────────────────────────────────────────
+function updateAudio(state){
+  simPhase+=.09;
+  amp=(state==='listening'||state==='speaking')
+    ?Math.max(0,.2+.8*Math.pow(Math.sin(simPhase),2)*Math.abs(Math.sin(simPhase*1.8)))
+    :amp*.88;
+  document.querySelectorAll('.ab').forEach((b,i)=>{
+    const active=state==='listening'||state==='speaking';
+    b.style.height=(active?Math.max(3,15*Math.abs(Math.sin(simPhase*(1.2+i*.22)+i*.6))):3)+'px';
+  });
+}
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+let last=performance.now();
+function loop(now){
+  const dt=Math.min((now-last)/1000,.05); last=now; T+=dt;
+  if(blend<1) blend=Math.min(1,blend+dt*2.8);
+  const eff=blend>.5?tgtState:curState;
+  updateAudio(eff);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  drawGrid(eff,T,amp);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ── Chat helpers (called by Python via evaluate_js too) ──────────────────────
+function addMsg(role, text, cls='') {
+  const d = document.createElement('div');
+  d.className = `msg ${role==='user'?'u':'j'} ${cls}`;
+  d.textContent = text;
+  const log = document.getElementById('log');
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+// ── Send via pywebview API ────────────────────────────────────────────────────
+function send(msg) {
+  if (!msg.trim() || busy) return;
+  busy = true;
+  addMsg('user', msg);
+  // Python takes over: sets state thinking→speaking→idle and calls addMsg
+  if (window.pywebview) {
+    window.pywebview.api.send_message(msg);
+  } else {
+    // Fallback: HTTP (when opened in browser for testing)
+    fetch('http://localhost:5000/send_message', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg})
+    }).then(r=>r.json()).then(d=>{
+      addMsg('jarvis', d.response || d.message || 'No response.');
+      setState('idle'); busy = false;
+    }).catch(()=>{ setState('error'); busy = false; });
+  }
+}
+
+// Python calls this to signal it's done so JS can unlock
+function onBrainDone() { busy = false; }
+
+document.getElementById('sb').addEventListener('click', () => {
+  const i = document.getElementById('inp'); send(i.value); i.value = '';
+});
+document.getElementById('inp').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { send(e.target.value); e.target.value = ''; }
+});
+
+// ── Mic button → Python STT ───────────────────────────────────────────────────
+document.getElementById('mb').addEventListener('click', () => {
+  if (busy) return;
+  busy = true;
+  document.getElementById('mb').classList.add('rec');
+  if (window.pywebview) {
+    window.pywebview.api.start_voice();
+  } else {
+    document.getElementById('mb').classList.remove('rec');
+    busy = false;
+  }
+});
+
+// Called by Python when voice capture ends (success or fail)
+function onVoiceDone() {
+  document.getElementById('mb').classList.remove('rec');
+}
+
+updateUI('idle');
+</script>
+</body>
+</html>

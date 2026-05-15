@@ -1,0 +1,103 @@
+[INFO   ] Logger: Record log in d:\ai/AI_Assistant\.kivy\logs\kivy_26-04-09_4.txt
+[INFO   ] deps: Successfully imported "kivy_deps.angle" 0.4.0
+[INFO   ] deps: Successfully imported "kivy_deps.glew" 0.3.1
+[INFO   ] deps: Successfully imported "kivy_deps.sdl2" 0.8.0
+[INFO   ] Kivy: v2.3.1
+[INFO   ] Kivy: Installed at "D:\ai\venv311\Lib\site-packages\kivy\__init__.py"
+[INFO   ] Python: v3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]
+[INFO   ] Python: Interpreter at "D:\ai\venv311\Scripts\python.exe"
+[INFO   ] Logger: Purge log fired. Processing...
+[INFO   ] Logger: Purge finished!
+[INFO   ] Factory: 195 symbols loaded
+[INFO   ] Image: Providers: img_tex, img_dds, img_sdl2, img_pil (img_ffpyplayer ignored)
+[INFO   ] Text: Provider: sdl2
+[INFO   ] Window: Provider: sdl2
+[INFO   ] GL: Using the "OpenGL" graphics system
+[INFO   ] GL: GLEW initialization succeeded
+[INFO   ] GL: Backend used <glew>
+[INFO   ] GL: OpenGL version <b'4.6.0 - Build 27.20.100.8729'>
+[INFO   ] GL: OpenGL vendor <b'Intel'>
+[INFO   ] GL: OpenGL renderer <b'Intel(R) UHD Graphics 630'>
+[INFO   ] GL: OpenGL parsed version: 4, 6
+[INFO   ] GL: Shading version <b'4.60 - Build 27.20.100.8729'>
+[INFO   ] GL: Texture max size <16384>
+[INFO   ] GL: Texture max units <32>
+[INFO   ] Window: auto add sdl2 input provider
+[INFO   ] Window: virtual keyboard not allowed, single mode, not docked
+[WARNING] stderr: d:\ai/AI_Assistant\jarvis_ai_brain.py:46: FutureWarning: 
+[WARNING] stderr: 
+[WARNING] stderr: All support for the `google.generativeai` package has ended. It will no longer be receiving 
+[WARNING] stderr: updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+[WARNING] stderr: See README for more details:
+[WARNING] stderr: 
+[WARNING] stderr: https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+[WARNING] stderr: 
+[WARNING] stderr:   import google.generativeai as _genai
+[DEBUG  ] CoInitializeEx(None, 2)
+[INFO   ] Imported existing <module 'comtypes.gen' from 'D:\\ai\\venv311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+[INFO   ] Using writeable comtypes cache directory: 'D:\ai\venv311\Lib\site-packages\comtypes\gen'
+[DEBUG  ] SAPI.SPVoice -> {96749377-3391-11D2-9EE3-00C04F797396}
+[DEBUG  ] CoCreateInstance({96749377-3391-11D2-9EE3-00C04F797396}, clsctx=None, interface=None)
+[DEBUG  ] GetBestInterface(<POINTER(IUnknown) ptr=0x2224e41b2f0 at 22260fc8450>)
+[DEBUG  ] Does implement IProvideClassInfo
+[DEBUG  ] Default interface is {269316D8-57BD-11D2-9EEE-00C04F797396}
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x2224e41b330 at 2226125e050>
+[DEBUG  ] GetModule(TLIBATTR(GUID={C866CA3A-32F7-11D2-9602-00C04F8EE628}, Version=5.4, LCID=0, FLags=0x8))
+[DEBUG  ] Implements default interface from typeinfo <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4.ISpeechVoice'>
+[DEBUG  ] Final result is <POINTER(ISpeechVoice) ptr=0x2224e41b330 at 2226125e350>
+[DEBUG  ] Release <POINTER(IProvideClassInfo) ptr=0x2224e41b350 at 2226125db50>
+[DEBUG  ] Release <POINTER(ITypeInfo) ptr=0x22259a7d848 at 2226125dd50>
+[DEBUG  ] <POINTER(ISpeechVoice) ptr=0x2224e41b330 at 2226125e350> using sinkinterface from clsid <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4._ISpeechVoiceEvents'>
+[DEBUG  ] Release <POINTER(IProvideClassInfo2) ptr=0x2224e41b350 at 2226125ddd0>
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x0000022261261690>: _ISpeechVoiceEvents.VoiceChange not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x0000022261261690>: _ISpeechVoiceEvents.Bookmark not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x0000022261261690>: _ISpeechVoiceEvents.Sentence not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x0000022261261690>: _ISpeechVoiceEvents.Phoneme not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x0000022261261690>: _ISpeechVoiceEvents.Viseme not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x0000022261261690>: _ISpeechVoiceEvents.AudioLevel not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x0000022261261690>: _ISpeechVoiceEvents.EnginePrivate not implemented
+[DEBUG  ] Start advise <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4._ISpeechVoiceEvents'>
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x0000022261261690>.QueryInterface({A372ACD1-3BEF-4BBD-8FFB-CB3E2B416AF8}) -> S_OK
+[DEBUG  ] 1 active COM objects: Added   <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x0000022261261690>
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x0000022261261690>.AddRef() -> 1
+[DEBUG  ] Release <POINTER(IConnectionPointContainer) ptr=0x2224e41b358 at 22260fc82d0>
+[DEBUG  ] wrap_outparam(<POINTER(ISpeechObjectToken) ptr=0x2224e34f420 at 22260fc8050>)
+[DEBUG  ] wrap_outparam(<POINTER(ISpeechObjectTokens) ptr=0x2224e3dc7d0 at 22260f47ad0>)
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x2224e8a15d0 at 22260f47750>
+[DEBUG  ] wrap_outparam(<POINTER(IDispatch) ptr=0x2224e8ccdd0 at 2226127c050>)
+[DEBUG  ] GetBestInterface(<POINTER(IDispatch) ptr=0x2224e8ccdd0 at 2226127c050>)
+[DEBUG  ] Does NOT implement IProvideClassInfo, trying IProvideClassInfo2
+[DEBUG  ] Does NOT implement IProvideClassInfo/IProvideClassInfo2
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x22259a7d950 at 2226127c350>
+[DEBUG  ] Default interface is {C74A3ADC-B727-4500-A84A-B526721C8B8C}
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x2224e8ccdd0 at 2226127c4d0>
+[DEBUG  ] GetModule(TLIBATTR(GUID={C866CA3A-32F7-11D2-9602-00C04F8EE628}, Version=5.4, LCID=0, FLags=0x8))
+[DEBUG  ] Implements default interface from typeinfo <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4.ISpeechObjectToken'>
+[DEBUG  ] Final result is <POINTER(ISpeechObjectToken) ptr=0x2224e8ccdd0 at 2226127c7d0>
+[DEBUG  ] Release <POINTER(IDispatch) ptr=0x2224e8ccdd0 at 2226127c3d0>
+[DEBUG  ] Release <POINTER(IEnumVARIANT) ptr=0x2224e8a15d0 at 22260f476d0>
+[DEBUG  ] wrap_outparam(<POINTER(ISpeechObjectTokens) ptr=0x2224e3dc6d0 at 2226125fed0>)
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x2224e8a1750 at 2226127c750>
+[DEBUG  ] wrap_outparam(<POINTER(IDispatch) ptr=0x2224e8cd330 at 2226127cad0>)
+[DEBUG  ] GetBestInterface(<POINTER(IDispatch) ptr=0x2224e8cd330 at 2226127cad0>)
+[DEBUG  ] Does NOT implement IProvideClassInfo, trying IProvideClassInfo2
+[DEBUG  ] Does NOT implement IProvideClassInfo/IProvideClassInfo2
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x22259a7d950 at 2226127cd50>
+[DEBUG  ] Default interface is {C74A3ADC-B727-4500-A84A-B526721C8B8C}
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x2224e8cd330 at 2226127ced0>
+[DEBUG  ] GetModule(TLIBATTR(GUID={C866CA3A-32F7-11D2-9602-00C04F8EE628}, Version=5.4, LCID=0, FLags=0x8))
+[DEBUG  ] Implements default interface from typeinfo <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4.ISpeechObjectToken'>
+[DEBUG  ] Final result is <POINTER(ISpeechObjectToken) ptr=0x2224e8cd330 at 2226127d1d0>
+[DEBUG  ] Release <POINTER(IDispatch) ptr=0x2224e8cd330 at 2226127cdd0>
+[DEBUG  ] wrap_outparam(<POINTER(IDispatch) ptr=0x2224e8cd3c0 at 2226127d2d0>)
+[DEBUG  ] GetBestInterface(<POINTER(IDispatch) ptr=0x2224e8cd3c0 at 2226127d2d0>)
+[DEBUG  ] Does NOT implement IProvideClassInfo, trying IProvideClassInfo2
+[DEBUG  ] Does NOT implement IProvideClassInfo/IProvideClassInfo2
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x22259a7d950 at 2226127d4d0>
+[DEBUG  ] Default interface is {C74A3ADC-B727-4500-A84A-B526721C8B8C}
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x2224e8cd3c0 at 2226127d650>
+[DEBUG  ] GetModule(TLIBATTR(GUID={C866CA3A-32F7-11D2-9602-00C04F8EE628}, Version=5.4, LCID=0, FLags=0x8))
+[DEBUG  ] Implements default interface from typeinfo <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4.ISpeechObjectToken'>
+[DEBUG  ] Final result is <POINTER(ISpeechObjectToken) ptr=0x2224e8cd3c0 at 2226127d950>
+[DEBUG  ] Release <POINTER(IDispatch) ptr=0x2224e8cd3c0 at 2226127d550>
+[DEBUG  ] Release <POINTER(IEnumVARIANT) ptr=0x2224e8a1750 at 2226127c950>

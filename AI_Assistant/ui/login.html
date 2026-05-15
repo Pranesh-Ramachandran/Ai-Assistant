@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS AI - Login</title>
+    <link rel="stylesheet" href="auth.css">
+</head>
+<body>
+    <div class="page">
+        <header class="brand">
+            <div class="status">Connected<span class="cursor">|</span></div>
+            <h1 class="title">JARVIS AI</h1>
+        </header>
+
+        <div class="ring-wrap" aria-hidden="true">
+            <div class="ring ring-outer"></div>
+            <div class="ring ring-inner"></div>
+            <div class="ring ring-core"></div>
+        </div>
+
+        <div class="auth-card">
+            <div class="form-container">
+                <div id="authMessage" class="auth-message" aria-live="polite"></div>
+                <div class="form-tabs">
+                    <button class="tab-btn active" id="loginTab">Login</button>
+                    <button class="tab-btn" id="registerTab">Register</button>
+                </div>
+                
+                <form id="loginForm" class="auth-form active">
+                    <div class="input-group">
+                        <input type="email" id="loginEmail" placeholder="Email" autocomplete="email" required autofocus>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required>
+                    </div>
+                    <button type="submit" class="auth-btn">Login</button>
+                </form>
+                
+                <form id="registerForm" class="auth-form">
+                    <div class="input-group">
+                        <input type="text" id="registerName" placeholder="Full Name" autocomplete="name" required>
+                    </div>
+                    <div class="input-group">
+                        <input type="email" id="registerEmail" placeholder="Email" autocomplete="email" required>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="registerPassword" placeholder="Password" autocomplete="new-password" required>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="confirmPassword" placeholder="Confirm Password" autocomplete="new-password" required>
+                    </div>
+                    <button type="submit" class="auth-btn">Register</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="auth.js"></script>
+</body>
+</html>

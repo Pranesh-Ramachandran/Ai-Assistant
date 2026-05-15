@@ -1,0 +1,97 @@
+[INFO   ] Logger: Record log in D:\ai\AI_Assistant\.kivy\logs\kivy_26-03-19_7.txt
+[INFO   ] deps: Successfully imported "kivy_deps.angle" 0.4.0
+[INFO   ] deps: Successfully imported "kivy_deps.glew" 0.3.1
+[INFO   ] deps: Successfully imported "kivy_deps.sdl2" 0.8.0
+[INFO   ] Kivy: v2.3.1
+[INFO   ] Kivy: Installed at "D:\ai\venv311\Lib\site-packages\kivy\__init__.py"
+[INFO   ] Python: v3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]
+[INFO   ] Python: Interpreter at "D:\ai\venv311\Scripts\python.exe"
+[INFO   ] Logger: Purge log fired. Processing...
+[INFO   ] Logger: Purge finished!
+[INFO   ] Factory: 195 symbols loaded
+[INFO   ] Image: Providers: img_tex, img_dds, img_sdl2, img_pil (img_ffpyplayer ignored)
+[INFO   ] Text: Provider: sdl2
+[INFO   ] Window: Provider: sdl2
+[INFO   ] GL: Using the "OpenGL" graphics system
+[INFO   ] GL: GLEW initialization succeeded
+[INFO   ] GL: Backend used <glew>
+[INFO   ] GL: OpenGL version <b'4.6.0 - Build 27.20.100.8729'>
+[INFO   ] GL: OpenGL vendor <b'Intel'>
+[INFO   ] GL: OpenGL renderer <b'Intel(R) UHD Graphics 630'>
+[INFO   ] GL: OpenGL parsed version: 4, 6
+[INFO   ] GL: Shading version <b'4.60 - Build 27.20.100.8729'>
+[INFO   ] GL: Texture max size <16384>
+[INFO   ] GL: Texture max units <32>
+[INFO   ] Window: auto add sdl2 input provider
+[INFO   ] Window: virtual keyboard not allowed, single mode, not docked
+[DEBUG  ] CoInitializeEx(None, 2)
+[INFO   ] Imported existing <module 'comtypes.gen' from 'D:\\ai\\venv311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+[INFO   ] Using writeable comtypes cache directory: 'D:\ai\venv311\Lib\site-packages\comtypes\gen'
+[DEBUG  ] SAPI.SPVoice -> {96749377-3391-11D2-9EE3-00C04F797396}
+[DEBUG  ] CoCreateInstance({96749377-3391-11D2-9EE3-00C04F797396}, clsctx=None, interface=None)
+[DEBUG  ] GetBestInterface(<POINTER(IUnknown) ptr=0x1fa804ab360 at 1fa8362bf50>)
+[DEBUG  ] Does implement IProvideClassInfo
+[DEBUG  ] Default interface is {269316D8-57BD-11D2-9EEE-00C04F797396}
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x1fa804ab3a0 at 1fa83935e50>
+[DEBUG  ] GetModule(TLIBATTR(GUID={C866CA3A-32F7-11D2-9602-00C04F8EE628}, Version=5.4, LCID=0, FLags=0x8))
+[DEBUG  ] Implements default interface from typeinfo <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4.ISpeechVoice'>
+[DEBUG  ] Final result is <POINTER(ISpeechVoice) ptr=0x1fa804ab3a0 at 1fa83936150>
+[DEBUG  ] Release <POINTER(IProvideClassInfo) ptr=0x1fa804ab3c0 at 1fa83935950>
+[DEBUG  ] Release <POINTER(ITypeInfo) ptr=0x1fa8bd58ac8 at 1fa83935b50>
+[DEBUG  ] <POINTER(ISpeechVoice) ptr=0x1fa804ab3a0 at 1fa83936150> using sinkinterface from clsid <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4._ISpeechVoiceEvents'>
+[DEBUG  ] Release <POINTER(IProvideClassInfo2) ptr=0x1fa804ab3c0 at 1fa83935bd0>
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x000001FA83933ED0>: _ISpeechVoiceEvents.VoiceChange not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x000001FA83933ED0>: _ISpeechVoiceEvents.Bookmark not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x000001FA83933ED0>: _ISpeechVoiceEvents.Sentence not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x000001FA83933ED0>: _ISpeechVoiceEvents.Phoneme not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x000001FA83933ED0>: _ISpeechVoiceEvents.Viseme not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x000001FA83933ED0>: _ISpeechVoiceEvents.AudioLevel not implemented
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x000001FA83933ED0>: _ISpeechVoiceEvents.EnginePrivate not implemented
+[DEBUG  ] Start advise <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4._ISpeechVoiceEvents'>
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x000001FA83933ED0>.QueryInterface({A372ACD1-3BEF-4BBD-8FFB-CB3E2B416AF8}) -> S_OK
+[DEBUG  ] 1 active COM objects: Added   <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x000001FA83933ED0>
+[DEBUG  ] <comtypes.client._events.CreateEventReceiver.<locals>.Sink object at 0x000001FA83933ED0>.AddRef() -> 1
+[DEBUG  ] Release <POINTER(IConnectionPointContainer) ptr=0x1fa804ab3c8 at 1fa836b01d0>
+[DEBUG  ] wrap_outparam(<POINTER(ISpeechObjectToken) ptr=0x1fa804abe50 at 1fa8362bbd0>)
+[DEBUG  ] wrap_outparam(<POINTER(ISpeechObjectTokens) ptr=0x1fa84937780 at 1fa8362bd50>)
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x1fa84938200 at 1fa8362b650>
+[DEBUG  ] wrap_outparam(<POINTER(IDispatch) ptr=0x1fa849402f0 at 1fa83937dd0>)
+[DEBUG  ] GetBestInterface(<POINTER(IDispatch) ptr=0x1fa849402f0 at 1fa83937dd0>)
+[DEBUG  ] Does NOT implement IProvideClassInfo, trying IProvideClassInfo2
+[DEBUG  ] Does NOT implement IProvideClassInfo/IProvideClassInfo2
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x1fa8bd58bd0 at 1fa83950150>
+[DEBUG  ] Default interface is {C74A3ADC-B727-4500-A84A-B526721C8B8C}
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x1fa849402f0 at 1fa839502d0>
+[DEBUG  ] GetModule(TLIBATTR(GUID={C866CA3A-32F7-11D2-9602-00C04F8EE628}, Version=5.4, LCID=0, FLags=0x8))
+[DEBUG  ] Implements default interface from typeinfo <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4.ISpeechObjectToken'>
+[DEBUG  ] Final result is <POINTER(ISpeechObjectToken) ptr=0x1fa849402f0 at 1fa839505d0>
+[DEBUG  ] Release <POINTER(IDispatch) ptr=0x1fa849402f0 at 1fa839501d0>
+[DEBUG  ] Release <POINTER(IEnumVARIANT) ptr=0x1fa84938200 at 1fa8362b5d0>
+[DEBUG  ] wrap_outparam(<POINTER(ISpeechObjectTokens) ptr=0x1fa84942e00 at 1fa83937cd0>)
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x1fa84937fc0 at 1fa83950550>
+[DEBUG  ] wrap_outparam(<POINTER(IDispatch) ptr=0x1fa8493fd50 at 1fa839508d0>)
+[DEBUG  ] GetBestInterface(<POINTER(IDispatch) ptr=0x1fa8493fd50 at 1fa839508d0>)
+[DEBUG  ] Does NOT implement IProvideClassInfo, trying IProvideClassInfo2
+[DEBUG  ] Does NOT implement IProvideClassInfo/IProvideClassInfo2
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x1fa8bd58bd0 at 1fa83950b50>
+[DEBUG  ] Default interface is {C74A3ADC-B727-4500-A84A-B526721C8B8C}
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x1fa8493fd50 at 1fa83950cd0>
+[DEBUG  ] GetModule(TLIBATTR(GUID={C866CA3A-32F7-11D2-9602-00C04F8EE628}, Version=5.4, LCID=0, FLags=0x8))
+[DEBUG  ] Implements default interface from typeinfo <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4.ISpeechObjectToken'>
+[DEBUG  ] Final result is <POINTER(ISpeechObjectToken) ptr=0x1fa8493fd50 at 1fa83950fd0>
+[DEBUG  ] Release <POINTER(IDispatch) ptr=0x1fa8493fd50 at 1fa83950bd0>
+[DEBUG  ] wrap_outparam(<POINTER(IDispatch) ptr=0x1fa84940530 at 1fa839510d0>)
+[DEBUG  ] GetBestInterface(<POINTER(IDispatch) ptr=0x1fa84940530 at 1fa839510d0>)
+[DEBUG  ] Does NOT implement IProvideClassInfo, trying IProvideClassInfo2
+[DEBUG  ] Does NOT implement IProvideClassInfo/IProvideClassInfo2
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x1fa8bd58bd0 at 1fa839512d0>
+[DEBUG  ] Default interface is {C74A3ADC-B727-4500-A84A-B526721C8B8C}
+[DEBUG  ] Release <POINTER(IUnknown) ptr=0x1fa84940530 at 1fa83951450>
+[DEBUG  ] GetModule(TLIBATTR(GUID={C866CA3A-32F7-11D2-9602-00C04F8EE628}, Version=5.4, LCID=0, FLags=0x8))
+[DEBUG  ] Implements default interface from typeinfo <class 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4.ISpeechObjectToken'>
+[DEBUG  ] Final result is <POINTER(ISpeechObjectToken) ptr=0x1fa84940530 at 1fa83951750>
+[DEBUG  ] Release <POINTER(IDispatch) ptr=0x1fa84940530 at 1fa83951350>
+[DEBUG  ] Release <POINTER(IEnumVARIANT) ptr=0x1fa84937fc0 at 1fa83950750>
+[INFO   ] Base: Start application main loop
+[INFO   ] GL: NPOT texture support is available
+[INFO   ] Base: Leaving application in progress...

@@ -1,0 +1,10 @@
+[INFO   ] Logger: Record log in D:\ai\AI_Assistant\.kivy\logs\kivy_26-04-09_0.txt
+[INFO   ] deps: Successfully imported "kivy_deps.angle" 0.4.0
+[INFO   ] deps: Successfully imported "kivy_deps.glew" 0.3.1
+[INFO   ] deps: Successfully imported "kivy_deps.sdl2" 0.8.0
+[INFO   ] Kivy: v2.3.1
+[INFO   ] Kivy: Installed at "D:\ai\venv311\Lib\site-packages\kivy\__init__.py"
+[INFO   ] Python: v3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]
+[INFO   ] Python: Interpreter at "D:\ai\venv311\Scripts\python.exe"
+[INFO   ] Logger: Purge log fired. Processing...
+[INFO   ] Logger: Purge finished!

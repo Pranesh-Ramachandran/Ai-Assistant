@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>JARVIS — Neural Grid</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    :root {
+      --bg:#F8FAFF; --bg2:#EEF2FA; --border:#DDE3F0; --text:#1A2540; --sub:#6B7A99;
+      --c-idle:#94A3B8; --c-listen:#0284C7; --c-think:#7C3AED; --c-speak:#059669; --c-error:#DC2626;
+      --card:#fff; --drawer:#fff;
+    }
+    body.dark {
+      --bg:#0D1117; --bg2:#161B22; --border:#30363D; --text:#E6EDF3; --sub:#8B949E;
+      --card:#161B22; --drawer:#1C2128;
+    }
+    html,body { width:100%; height:100%; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; transition:background .3s,color .3s; }
+    #app { display:flex; flex-direction:column; align-items:center; height:100vh; padding:22px 20px 16px; }
+
+    /* Offline banner */
+    #offline-banner { display:none; width:100%; max-width:520px; background:#FEF2F2; border:1px solid #FECACA; border-radius:9px; padding:7px 14px; font-size:11px; color:#DC2626; font-weight:500; margin-bottom:8px; text-align:center; }
+    #offline-banner.show { display:block; }
+
+    /* App entry animation */
+    #app { animation: app-enter 0.6s ease-out; }
+    @keyframes app-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+    /* Header */
+    header { width:100%; max-width:520px; display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+    .logo  { font-size:12px; font-weight:600; letter-spacing:5px; text-transform:uppercase; color:var(--accent,#0284C7); transition:color .6s; }
+    .pill  { display:flex; align-items:center; gap:6px; font-size:10px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; padding:5px 13px; border-radius:20px; border:1px solid var(--border); background:var(--card); color:var(--sub); transition:all .5s; }
+    .dot   { width:6px; height:6px; border-radius:50%; background:var(--c-idle); transition:background .5s,box-shadow .5s; }
+
+    /* Canvas */
+    #wrap  { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; max-width:520px; gap:10px; }
+    #cv    { display:block; }
+    #sub-lbl { font-size:11px; font-weight:400; color:var(--sub); letter-spacing:.3px; min-height:16px; transition:color .5s; }
+
+    /* Panel */
+    #panel { width:100%; max-width:520px; display:flex; flex-direction:column; gap:10px; }
+    .tabs  { display:flex; background:var(--bg2); border-radius:10px; padding:3px; gap:1px; }
+    .tab   { flex:1; font-size:11px; font-weight:500; letter-spacing:.3px; border:none; border-radius:8px; padding:7px 4px; background:none; color:var(--sub); cursor:pointer; transition:all .2s; }
+    .tab:hover  { color:var(--text); background:rgba(128,128,128,.08); }
+    .tab.active { background:var(--card); color:var(--accent,#0284C7); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.10); }
+    hr { border:none; border-top:1px solid var(--border); }
+
+    /* Chat — increased height for usability */
+    #log { display:flex; flex-direction:column; gap:4px; max-height:160px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+    #log::-webkit-scrollbar { width:4px; }
+    #log::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+    .msg { font-size:12px; padding:5px 11px; border-radius:8px; max-width:88%; animation:up .25s ease; line-height:1.5; }
+    @keyframes up { from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none} }
+    .msg.u { align-self:flex-end; background:var(--bg2); color:var(--text); font-weight:500; }
+    .msg.j { align-self:flex-start; background:var(--card); color:var(--sub); border:1px solid var(--border); }
+    .msg.j.loading { font-style:italic; }
+
+    /* Input */
+    .row { display:flex; gap:7px; align-items:center; }
+    input[type="text"], input[type="number"], select { background:var(--card); border:1px solid var(--border); border-radius:9px; padding:9px 13px; font:14px 'Inter',sans-serif; color:var(--text); outline:none; transition:border-color .2s,box-shadow .2s; }
+    input::placeholder { color:var(--sub); }
+    input:focus, select:focus { border-color:var(--accent,#0284C7); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,#0284C7) 12%,transparent); }
+    #inp { flex:1; }
+    .ib { width:40px; height:40px; border-radius:9px; border:1px solid var(--border); background:var(--bg2); color:var(--sub); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .2s; flex-shrink:0; }
+    .ib:hover { border-color:var(--accent,#0284C7); color:var(--accent,#0284C7); }
+    #sb { background:var(--accent,#0284C7); color:#fff; border-color:var(--accent,#0284C7); position:relative; }
+    #sb:hover { opacity:.88; }
+    #sb.loading { color: transparent; pointer-events: none; }
+    #sb.loading::after { content: ''; position: absolute; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: sb-spin .6s linear infinite; }
+    @keyframes sb-spin { to { transform: rotate(360deg); } }
+    #mb { position:relative; }
+    #mb::before { content:''; position:absolute; inset:-4px; border-radius:50%; border:2px solid var(--c-listen); opacity:0; transform:scale(.8); transition:all .3s; }
+    #mb:not(.rec):hover::before { opacity:.4; transform:scale(1); animation:mb-pulse-idle 2s ease-out infinite; }
+    @keyframes mb-pulse-idle { 0%{transform:scale(.8);opacity:.5} 100%{transform:scale(1.3);opacity:0} }
+    #mb.rec { border-color:var(--c-listen); color:var(--c-listen); animation:mb-pulse 1s ease-in-out infinite; }
+    @keyframes mb-pulse { 50%{box-shadow:0 0 0 5px color-mix(in srgb,var(--c-listen) 18%,transparent)} }
+
+    /* Hamburger */
+    #menu-btn { background:none; border:none; cursor:pointer; padding:4px; color:var(--sub); font-size:20px; line-height:1; }
+    #menu-btn:hover { color:var(--text); }
+    #menu-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.3); z-index:10; }
+    #menu-overlay.open { display:block; }
+    #menu-drawer { position:fixed; top:0; right:0; height:100%; width:210px; background:var(--drawer); box-shadow:-4px 0 20px rgba(0,0,0,.18); z-index:11; padding:20px 16px; display:flex; flex-direction:column; gap:4px; transform:translateX(100%); transition:transform .22s ease; }
+    #menu-drawer.open { transform:none; }
+    .menu-title { font-size:10px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:var(--sub); margin-bottom:6px; }
+    .menu-item { font-size:13px; font-weight:500; padding:9px 12px; border-radius:8px; border:none; background:none; color:var(--text); cursor:pointer; text-align:left; width:100%; transition:background .15s; }
+    .menu-item:hover { background:var(--bg2); }
+    .menu-sep { border:none; border-top:1px solid var(--border); margin:4px 0; }
+
+    /* Footer */
+    .frow { display:flex; align-items:center; justify-content:space-between; }
+    #abars { display:flex; align-items:flex-end; gap:2px; height:18px; }
+    .ab { width:3px; border-radius:2px; background:var(--border); min-height:3px; transition:height .09s,background .5s; }
+    #ftxt { font-size:10px; color:var(--sub); letter-spacing:.3px; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- Offline / server status banner -->
+  <div id="offline-banner">⚠ JARVIS server offline — start jarvis_grid_server.py to enable AI features</div>
+
+  <header>
+    <div class="logo" id="logo">Jarvis</div>
+    <div class="pill" id="pill"><div class="dot" id="pill-dot"></div><span id="pill-txt">Idle</span></div>
+    <button class="ib" id="mb" title="Interrupt & Listen" style="width:36px;height:36px;font-size:14px">&#127908;</button>
+    <button id="menu-btn" title="Menu">&#9776;</button>
+  </header>
+
+  <div id="menu-overlay"></div>
+  <div id="menu-drawer">
+    <div class="menu-title">JARVIS</div>
+    <button class="menu-item" id="m-chat">&#128172; Chat</button>
+    <button class="menu-item" id="m-vision">&#128065; Vision</button>
+    <button class="menu-item" id="m-booking">&#127916; Book Tickets</button>
+    <button class="menu-item" id="m-messages">&#128172; Messages</button>
+    <hr class="menu-sep" />
+    <button class="menu-item" id="m-system">&#128187; System</button>
+    <button class="menu-item" id="m-voice">&#128273; Voice ID</button>
+    <button class="menu-item" id="m-games">&#127918; Games</button>
+    <button class="menu-item" id="m-calendar">&#128197; Calendar</button>
+    <button class="menu-item" id="m-memory">&#129504; Memory</button>
+    <button class="menu-item" id="m-smarthome">&#127968; Smart Home</button>
+    <button class="menu-item" id="m-desktop">&#128187; Desktop</button>
+    <hr class="menu-sep" />
+    <button class="menu-item" id="m-wake">&#127908; Wake Word: OFF</button>
+    <button class="menu-item" id="m-dark">&#127773; Dark Mode</button>
+    <button class="menu-item" id="m-clr2">&#128465; Clear Memory</button>
+    <button class="menu-item" id="menu-clear-chat">&#128465; Clear History</button>
+    <hr class="menu-sep" />
+    <button class="menu-item" id="m-tts-stop">&#9209; Stop Speaking</button>
+    <hr class="menu-sep" />
+    <button class="menu-item" id="m-lang">&#127760; Language: English</button>
+  </div>
+
+  <div id="wrap">
+    <canvas id="cv"></canvas>
+    <div id="sub-lbl">Waiting for input</div>
+  </div>
+
+  <div id="panel">
+    <div class="tabs" id="vtabs">
+      <button class="tab active" data-v="chat">&#128172; Chat</button>
+      <button class="tab" data-v="vision">&#128065; Vision</button>
+      <button class="tab" data-v="booking">&#127916; Book</button>
+      <button class="tab" data-v="messages">&#128172; Msg</button>
+    </div>
+    <hr />
+
+    <div id="v-chat">
+      <div id="log"></div>
+      <div class="row">
+        <input id="inp" type="text" placeholder="Ask Jarvis something…" autocomplete="off" />
+        <button class="ib" id="sb" title="Send">&#8593;</button>
+        <button class="ib" id="clr" title="Clear History">&#128465;</button>
+      </div>
+      <div style="font-size:9px; color:var(--sub); text-align:center; margin-top:4px;">Hint: Press <kbd>Ctrl+M</kbd> to toggle microphone</div>
+      <div class="row" style="margin-top:6px">
+        <input id="music-input" type="text" placeholder="Song, artist or playlist…" style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="music-btn">&#127925; Play</button>
+      </div>
+    </div>
+
+    <div id="v-system" style="display:none">
+      <div id="sys-out" style="font-size:11px;color:var(--sub);min-height:52px;line-height:1.8">Loading…</div>
+      <div class="row" style="margin-top:6px">
+        <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="sys-refresh">&#8635; Refresh</button>
+        <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="sys-wake">Wake Word: OFF</button>
+      </div>
+    </div>
+
+    <div id="v-voice" style="display:none">
+      <div id="vid-out" style="font-size:11px;color:var(--sub);min-height:36px;line-height:1.8">No profiles enrolled.</div>
+      <div class="row" style="margin-top:6px">
+        <input id="enroll-name" type="text" placeholder="Your name…" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="enroll-btn">+ Enroll</button>
+        <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="vid-btn">&#128269; Identify</button>
+      </div>
+    </div>
+
+
+    <!-- GAMES -->
+    <div id="v-games" style="display:none">
+      <div id="game-out" style="font-size:12px;color:var(--sub);min-height:40px;line-height:1.8;padding:4px 0"></div>
+      <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:5px">
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-game="riddle">&#129300; Riddle</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-game="joke">&#128514; Joke</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-game="number">&#127922; Guess</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-game="math">&#129518; Math</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-game="quote">&#128161; Quote</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <input id="game-inp" type="text" placeholder="Your answer..." style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="game-ans-btn">Submit</button>
+      </div>
+    </div>
+
+    <!-- BOOKING -->
+    <div id="v-booking" style="display:none">
+      <div id="book-out" style="font-size:11px;color:var(--sub);min-height:36px;line-height:1.8">Select a movie to begin.</div>
+
+      <!-- Step 1: Movie + city -->
+      <div id="book-step1">
+        <div class="row" style="margin-bottom:6px;gap:6px">
+          <select id="book-movie" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none">
+            <option value="">Loading movies...</option>
+          </select>
+          <input id="book-city" type="text" placeholder="City" value="Chennai" style="width:90px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 9px;font:12px Inter,sans-serif;color:var(--text);outline:none" />
+          <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="book-city-btn">&#8635;</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Theater -->
+      <div id="book-step2" style="display:none;margin-bottom:6px">
+        <select id="book-theater" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none">
+          <option value="">Loading theaters...</option>
+        </select>
+      </div>
+
+      <!-- Step 3: Showtimes -->
+      <div id="book-step3" style="display:none;margin-bottom:6px">
+        <div id="book-shows" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+      </div>
+
+      <!-- Step 4: Seat count + confirm banner -->
+      <div id="book-step4" style="display:none">
+        <div class="row" style="gap:6px;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--text);flex:1" id="book-confirm-msg"></span>
+          <input id="book-seats" type="number" min="1" max="10" value="1" style="width:52px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 9px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+          <span style="font-size:11px;color:var(--sub)">seats</span>
+        </div>
+        <!-- Confirmation banner -->
+        <div id="book-confirm-bar" style="background:#FFF9C4;border:1px solid #F0C040;border-radius:9px;padding:8px 12px;font-size:11px">
+          <span id="book-confirm-detail"></span>
+          <div class="row" style="margin-top:6px;gap:6px">
+            <button class="ib" style="width:auto;padding:0 14px;font-size:11px;background:#0284C7;color:#fff;border-color:#0284C7" id="book-checkout-btn">&#127915; Open BookMyShow</button>
+            <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="book-back-btn">&#8592; Back</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CALENDAR -->
+    <div id="v-calendar" style="display:none">
+      <div id="cal-out" style="font-size:11px;color:var(--sub);min-height:52px;line-height:1.8">Loading...</div>
+      <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:5px">
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-cal="today">Today</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-cal="week">This Week</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-cal="next">Next Event</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-cal="free">Free Slots</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <input id="cal-summary" type="text" placeholder="Event title..." style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <input id="cal-when" type="text" placeholder="When? (e.g. tomorrow 3pm)" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="cal-add-btn">+ Add</button>
+      </div>
+      <div id="cal-confirm-bar" style="display:none;background:#FFF9C4;border:1px solid #F0C040;border-radius:9px;padding:8px 12px;font-size:11px;margin-top:6px">
+        <span id="cal-confirm-msg"></span>
+        <div class="row" style="margin-top:4px;gap:6px">
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px;background:#059669;color:#fff;border-color:#059669" id="cal-yes-btn">&#10003; Add Event</button>
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="cal-no-btn">&#10005; Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MEMORY -->
+    <div id="v-memory" style="display:none">
+      <div id="mem-out" style="font-size:11px;color:var(--sub);min-height:36px;line-height:1.8">Loading profile...</div>
+
+      <!-- Profile row -->
+      <div class="row" style="margin-top:6px;gap:6px">
+        <input id="mem-name" type="text" placeholder="Your name..." style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <input id="mem-city" type="text" placeholder="Home city..." style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px;background:var(--accent,#0284C7);color:#fff;border-color:var(--accent)" id="mem-save-btn">Save</button>
+      </div>
+
+      <!-- Booking preferences -->
+      <div class="row" style="margin-top:6px;gap:6px">
+        <input id="mem-theater" type="text" placeholder="Favourite theater..." style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <input id="mem-seats" type="number" min="1" max="10" placeholder="Seats" style="width:60px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 9px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="mem-booking-btn">&#127916; Save</button>
+      </div>
+
+      <!-- Vision preferences -->
+      <div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--sub);align-self:center">Camera:</span>
+        <button class="ib mem-toggle" id="mem-cam-rear" data-pref="camera_mode" data-val="rear" style="width:auto;padding:0 10px;font-size:11px">&#128247; Rear</button>
+        <button class="ib mem-toggle" id="mem-cam-front" data-pref="camera_mode" data-val="front" style="width:auto;padding:0 10px;font-size:11px">&#129333; Front</button>
+        <span style="font-size:11px;color:var(--sub);align-self:center;margin-left:6px">Vision:</span>
+        <button class="ib mem-toggle" id="mem-cloud-off" data-pref="cloud_vision" data-val="off" style="width:auto;padding:0 10px;font-size:11px">&#128274; Local only</button>
+        <button class="ib mem-toggle" id="mem-cloud-on" data-pref="cloud_vision" data-val="on" style="width:auto;padding:0 10px;font-size:11px">&#9729; Cloud on</button>
+      </div>
+
+      <!-- Saved places -->
+      <div class="row" style="margin-top:6px;gap:6px">
+        <input id="mem-place-label" type="text" placeholder="Label (home/office...)" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <input id="mem-place-name" type="text" placeholder="Place name..." style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="mem-place-btn">&#128205; Save</button>
+      </div>
+      <div id="mem-places" style="font-size:10px;color:var(--sub);margin-top:4px;line-height:1.8"></div>
+    </div>
+
+    <!-- SMART HOME -->
+    <div id="v-smarthome" style="display:none">
+      <div id="home-out" style="font-size:11px;color:var(--sub);min-height:36px;line-height:1.8">Ready.</div>
+      <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:5px">
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-scene="movie">&#127916; Movie</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-scene="sleep">&#128564; Sleep</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-scene="work">&#128187; Work</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-scene="morning">&#127774; Morning</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" data-scene="relax">&#127774; Relax</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <input id="home-cmd" type="text" placeholder="e.g. turn on bedroom light, dim to 30%" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px;background:var(--accent,#0284C7);color:#fff;border-color:var(--accent)" id="home-send-btn">Send</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="home-list-btn">&#128295; Devices</button>
+      </div>
+      <!-- Add Device form -->
+      <details style="margin-top:8px">
+        <summary style="font-size:11px;color:var(--sub);cursor:pointer;user-select:none">&#43; Add / Edit Device</summary>
+        <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px">
+          <div class="row" style="gap:6px">
+            <input id="dev-name" type="text" placeholder="Device name (e.g. bedroom light)" style="flex:2;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:12px Inter,sans-serif;color:var(--text);outline:none" />
+            <select id="dev-type" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 8px;font:12px Inter,sans-serif;color:var(--text);outline:none">
+              <option value="tasmota">Tasmota</option>
+              <option value="shelly">Shelly</option>
+              <option value="hass">Home Assistant</option>
+              <option value="tuya">Tuya</option>
+              <option value="generic">Generic REST</option>
+            </select>
+          </div>
+          <div class="row" style="gap:6px">
+            <input id="dev-ip" type="text" placeholder="IP address (e.g. 192.168.1.100)" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:12px Inter,sans-serif;color:var(--text);outline:none" />
+            <input id="dev-hass-entity" type="text" placeholder="HA entity (e.g. light.bedroom)" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:12px Inter,sans-serif;color:var(--text);outline:none" />
+          </div>
+          <div class="row" style="gap:6px">
+            <button class="ib" style="width:auto;padding:0 12px;font-size:11px;background:var(--accent,#0284C7);color:#fff;border-color:var(--accent)" id="dev-add-btn">&#10003; Save Device</button>
+            <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="dev-remove-btn">&#128465; Remove</button>
+          </div>
+          <div style="font-size:10px;color:var(--sub)">For Home Assistant: set HASS_URL and HASS_TOKEN in jarvis.env</div>
+        </div>
+      </details>
+      <div id="home-confirm-bar" style="display:none;background:#FFF9C4;border:1px solid #F0C040;border-radius:9px;padding:8px 12px;font-size:11px;margin-top:6px">
+        <span id="home-confirm-msg"></span>
+        <div class="row" style="margin-top:4px;gap:6px">
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px;background:#059669;color:#fff;border-color:#059669" id="home-yes-btn">&#10003; Confirm</button>
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="home-no-btn">&#10005; Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESKTOP -->
+    <div id="v-desktop" style="display:none">
+      <div id="desk-out" style="font-size:11px;color:var(--sub);min-height:36px;line-height:1.8">Ready.</div>
+      <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:5px">
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="desk-windows-btn">&#128462; Windows</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="desk-clipboard-btn">&#128203; Clipboard</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="desk-recent-btn">&#128196; Recent Files</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <input id="desk-cmd" type="text" placeholder="e.g. open VS Code, find file report.pdf" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px;background:var(--accent,#0284C7);color:#fff;border-color:var(--accent)" id="desk-send-btn">Run</button>
+      </div>
+      <div id="desk-run-confirm-bar" style="display:none;background:#FFF9C4;border:1px solid #F0C040;border-radius:9px;padding:8px 12px;font-size:11px;margin-top:6px">
+        <span id="desk-run-confirm-msg"></span>
+        <div class="row" style="margin-top:4px;gap:6px">
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px;background:#059669;color:#fff;border-color:#059669" id="desk-run-yes-btn">&#10003; Run</button>
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="desk-run-no-btn">&#10005; Cancel</button>
+        </div>
+      </div>
+      <!-- Web search row -->
+      <div class="row" style="margin-top:6px">
+        <input id="web-cmd" type="text" placeholder="Search product or Google query..." style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <select id="web-site" style="background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 8px;font:12px Inter,sans-serif;color:var(--text);outline:none">
+          <option value="flipkart">Flipkart</option>
+          <option value="amazon">Amazon</option>
+          <option value="google">Google</option>
+        </select>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="web-search-btn">&#128269; Search</button>
+      </div>
+      <!-- Confirmation banner (hidden by default) -->
+      <div id="desk-confirm-bar" style="display:none;background:#FFF9C4;border:1px solid #F0C040;border-radius:9px;padding:8px 12px;font-size:11px;margin-top:6px">
+        <span id="desk-confirm-msg"></span>
+        <div class="row" style="margin-top:4px;gap:6px">
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px;background:#059669;color:#fff;border-color:#059669" id="desk-yes-btn">&#10003; Confirm</button>
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="desk-no-btn">&#10005; Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VISION -->
+    <div id="v-vision" style="display:none">
+      <div id="vis-out" style="font-size:11px;color:var(--sub);min-height:52px;line-height:1.8;white-space:pre-wrap">Ready. Tap Camera to start.</div>
+
+      <!-- Row 1: camera controls -->
+      <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:5px">
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="vis-camera-btn">&#128247; Camera</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="vis-flip-btn">&#8635; Flip</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="vis-stop-btn">&#9209; Stop</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="vis-upload-btn">&#128193; Upload</button>
+        <input id="vis-file-input" type="file" accept="image/*" capture="environment" style="display:none" />
+      </div>
+
+      <!-- Row 2: actions — free (local) vs cloud -->
+      <div class="row" style="margin-top:5px;flex-wrap:wrap;gap:5px">
+        <span style="font-size:10px;color:var(--sub);align-self:center;letter-spacing:.5px">FREE:</span>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="vis-ocr-btn">&#128196; Read Text</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="vis-qr-btn">&#9638; Scan QR</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="vis-screen-btn">&#128444; Screen</button>
+        <span style="font-size:10px;color:var(--sub);align-self:center;letter-spacing:.5px;margin-left:4px">CLOUD:</span>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="vis-analyze-btn">&#10024; Analyze</button>
+      </div>
+
+      <!-- Camera preview -->
+      <div style="margin-top:8px;border:1px solid var(--border);border-radius:14px;overflow:hidden;position:relative;background:#000;box-shadow:0 14px 30px rgba(0,0,0,.22)">
+        <video id="vis-preview" autoplay playsinline muted style="width:100%;height:220px;object-fit:cover;display:block"></video>
+        <!-- uploaded image preview -->
+        <img id="vis-img-preview" style="display:none;width:100%;height:220px;object-fit:contain;background:#111" />
+        <div id="vis-live-badge" style="position:absolute;left:10px;top:10px;padding:5px 10px;border-radius:999px;background:rgba(15,23,42,.8);color:#E2E8F0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;border:1px solid rgba(255,255,255,.12)">Camera off</div>
+        <!-- permission prompt overlay -->
+        <div id="vis-perm-overlay" style="display:none;position:absolute;inset:0;background:rgba(15,23,42,.92);flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px">
+          <div style="font-size:13px;color:#E2E8F0;text-align:center">JARVIS needs camera access</div>
+          <div style="font-size:11px;color:#94A3B8;text-align:center">Used only for local OCR and QR scanning. No data is sent unless you tap Analyze.</div>
+          <button class="ib" id="vis-perm-btn" style="width:auto;padding:0 18px;font-size:12px;background:var(--accent,#0284C7);color:#fff;border-color:var(--accent,#0284C7)">Allow Camera</button>
+        </div>
+      </div>
+      <canvas id="vis-canvas" style="display:none"></canvas>
+
+      <!-- Vision confirmation banner -->
+      <div id="vis-confirm-bar" style="display:none;background:#FFF9C4;border:1px solid #F0C040;border-radius:9px;padding:8px 12px;font-size:11px;margin-top:6px">
+        <span id="vis-confirm-msg"></span>
+        <div class="row" style="margin-top:4px;gap:6px">
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px;background:#059669;color:#fff;border-color:#059669" id="vis-yes-btn">&#10024; Analyze with Gemini</button>
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="vis-no-btn">&#10005; Keep local</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MESSAGES -->
+    <div id="v-messages" style="display:none">
+      <div id="msg-out" style="font-size:11px;color:var(--sub);min-height:36px;line-height:1.8">Send messages or open messaging apps.</div>
+      <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:5px">
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="msg-whatsapp-btn">&#128241; WhatsApp</button>
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px" id="msg-sms-btn">&#128172; Messages</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <input id="msg-contact" type="text" placeholder="Contact name..." style="flex:1;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <input id="msg-text" type="text" placeholder="Message..." style="flex:2;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
+        <button class="ib" style="width:auto;padding:0 10px;font-size:11px;background:var(--accent,#0284C7);color:#fff;border-color:var(--accent)" id="msg-send-btn">&#10148; Draft</button>
+      </div>
+      <!-- Confirmation banner -->
+      <div id="msg-confirm-bar" style="display:none;background:#FFF9C4;border:1px solid #F0C040;border-radius:9px;padding:8px 12px;font-size:11px;margin-top:6px">
+        <span id="msg-confirm-msg"></span>
+        <div class="row" style="margin-top:4px;gap:6px">
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px;background:#059669;color:#fff;border-color:#059669" id="msg-yes-btn">&#10003; Send</button>
+          <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="msg-no-btn">&#10005; Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div class="frow">
+      <div id="abars">
+        <div class="ab" style="height:3px"></div><div class="ab" style="height:5px"></div>
+        <div class="ab" style="height:9px"></div><div class="ab" style="height:6px"></div>
+        <div class="ab" style="height:3px"></div><div class="ab" style="height:7px"></div>
+        <div class="ab" style="height:4px"></div><div class="ab" style="height:11px"></div>
+        <div class="ab" style="height:5px"></div><div class="ab" style="height:3px"></div>
+        <div class="ab" style="height:8px"></div><div class="ab" style="height:4px"></div>
+      </div>
+      <div id="ftxt">JARVIS · <span id="fver">v2.1</span></div>
+    </div>
+  </div>
+</div>
+<script>
+const API = 'http://localhost:7890';
+const views = { chat:'v-chat', system:'v-system', voice:'v-voice', games:'v-games', booking:'v-booking', calendar:'v-calendar', memory:'v-memory', smarthome:'v-smarthome', desktop:'v-desktop', vision:'v-vision', messages:'v-messages' };
+let wakeOn = false, busy = false, micActive = false;
+let speechWatchdog = null;
+let ttsSyncTimer = null;
+let visionStream = null, currentView = 'chat';
+
+const PAL = {
+  idle:     { r:.47,g:.54,b:.68, hex:'#94A3B8', name:'Idle',      sub:'Waiting for input',        pillBg:'#F8FAFF', pillFg:'#6B7A99' },
+  listening:{ r:.01,g:.52,b:.78, hex:'#0284C7', name:'Listening', sub:'Listening… speak now',      pillBg:'#F0F9FF', pillFg:'#0284C7' },
+  thinking: { r:.48,g:.22,b:.93, hex:'#7C3AED', name:'Thinking',  sub:'Processing…',              pillBg:'#F5F3FF', pillFg:'#7C3AED' },
+  speaking: { r:.02,g:.59,b:.41, hex:'#059669', name:'Speaking',  sub:'Speaking…',                pillBg:'#ECFDF5', pillFg:'#059669' },
+  error:    { r:.86,g:.15,b:.15, hex:'#DC2626', name:'Error',     sub:'Something went wrong.',    pillBg:'#FFF5F5', pillFg:'#DC2626' },
+};
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const wrap = document.getElementById('wrap');
+const visVideo = document.getElementById('vis-preview');
+const visCanvas = document.getElementById('vis-canvas');
+const visBadge = document.getElementById('vis-live-badge');
+const COLS=12, ROWS=12;  // reduced from 18x18 (324) to 12x12 (144) dots for less claustrophobic feel
+let dots=[], curState='idle', tgtState='idle', blend=1, T=0, amp=0, simPhase=0;
+
+function initDots(){
+  dots=[];
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
+    dots.push({r,c,phase:Math.random()*Math.PI*2,speed:.65+Math.random()*.7,glitch:0,lastFire:-99});
+}
+initDots();
+function resize(){ const sz=Math.min(wrap.clientWidth*.94,wrap.clientHeight*.9,460); cv.width=cv.height=sz; }
+resize(); window.addEventListener('resize',resize);
+
+function setState(s){
+  if(s===tgtState) return;
+  curState=blend>.5?tgtState:curState; tgtState=s; blend=0; updateUI(s);
+}
+function updateUI(s){
+  const p=PAL[s];
+  document.documentElement.style.setProperty('--accent',p.hex);
+  document.getElementById('logo').style.color=p.hex;
+  const pill=document.getElementById('pill'), dot=document.getElementById('pill-dot');
+  pill.style.background=p.pillBg; pill.style.borderColor=p.hex+'44'; pill.style.color=p.pillFg;
+  dot.style.background=p.hex; dot.style.boxShadow=`0 0 0 3px ${p.hex}28`;
+  document.getElementById('pill-txt').textContent=p.name;
+  const lbl=document.getElementById('sub-lbl'); lbl.textContent=p.sub; lbl.style.color=p.hex;
+  const bc=s==='error'?'#DC2626':s==='thinking'?'#7C3AED':s==='speaking'?'#059669':s==='listening'?'#0284C7':'#DDE3F0';
+  document.querySelectorAll('.ab').forEach(b=>b.style.background=bc);
+}
+
+function lerp(a,b,f){return a+(b-a)*f;}
+function mixPal(a,b,f){return{r:lerp(a.r,b.r,f),g:lerp(a.g,b.g,f),b:lerp(a.b,b.b,f)};}
+function rgba(c,a){return `rgba(${(c.r*255)|0},${(c.g*255)|0},${(c.b*255)|0},${a.toFixed(3)})`; }
+
+function aIdle(d,dist,angle,T,col){
+  const nx=d.c/(COLS-1)*2-1, ny=d.r/(ROWS-1)*2-1;
+  const sweep=Math.sin(T*.35+nx*1.5+ny*.8)*.4+.2, breath=Math.sin(T*.6*d.speed+d.phase)*.4+.5;  // smoother, slower breathing
+  return{alpha:.18+.15*Math.max(0,sweep)+.06*breath, radius:0.9+.4*Math.max(0,sweep)+.2*breath};  // reduced intensity
+}
+function aListening(d,dist,angle,T,col,amp){
+  const bounce=Math.sin(T*4.0+d.c*.35+d.phase*.3)*.4+.5, wave=Math.sin(T*2.5-dist*4+d.phase*.25)*.3;  // gentler wave
+  return{alpha:.20+.35*bounce*(1-dist*.4)+.15*Math.max(0,wave)+amp*.5*.25, radius:.85+.7*bounce*(1-dist*.25)+.25*Math.max(0,wave)+amp*.5*.25};
+}
+function aThinking(d,dist,angle,T,col){
+  const s1=Math.sin(T*2.0-angle*2-dist*3.5+d.phase)*.4+.4, s2=Math.sin(T*1.4+angle*1.2-dist*2.5+d.phase)*.3+.4;  // slower spin
+  const fire=T-d.lastFire<.25?(1-(T-d.lastFire)/.25):0;
+  if(Math.random()<.0015) d.lastFire=T;  // less frequent sparks
+  const combined=Math.max(s1,s2*.5,fire*.6);
+  const mix=dist*.4;
+  return{alpha:.18+.45*combined, radius:.75+.8*combined,
+    cr:PAL.thinking.r*(1-mix)+PAL.listening.r*mix,
+    cg:PAL.thinking.g*(1-mix)+PAL.listening.g*mix,
+    cb:PAL.thinking.b*(1-mix)+PAL.listening.b*mix};
+}
+function aSpeaking(d,dist,angle,T,col,amp){
+  const r1=Math.sin(T*4.5-dist*6)*.4+.5, r2=Math.sin(T*4.5-dist*6-1.5)*.4+.5, r3=Math.sin(T*4.5-dist*6-3.0)*.4+.5;
+  const ring=Math.max(r1,r2,r3), boost=amp*.35;
+  return{alpha:.20+.40*ring+boost*Math.sin(T*10-dist*3.5)*.4*.25, radius:.80+.85*ring+boost*.3};
+}
+function aError(d,dist,angle,T,col){
+  d.glitch=d.glitch*.92+(Math.random()<.010?Math.random():0)*.1;  // less frequent flicker
+  const broken=Math.sin(T*3.5+d.phase*1.8)*(1-dist*.5);
+  return{alpha:.12+.28*Math.max(0,broken)+d.glitch*.8, radius:.6+.6*Math.max(0,broken)+d.glitch*.9,
+    cr:col.r, cg:col.g*(1-d.glitch*.5), cb:col.b*(1-d.glitch*.3)};
+}
+
+function drawGrid(state,T,amp){
+  const W=cv.width,H=cv.height,cx=W/2,cy=H/2,gw=W*.70;
+  const stepX=gw/(COLS-1),stepY=gw/(ROWS-1),ox=cx-gw/2,oy=cy-gw/2,baseR=W/120;
+  const col=mixPal(PAL[curState],PAL[tgtState],blend);
+  
+  // Draw grid dots with smooth animations
+  for(const d of dots){
+    const px=ox+d.c*stepX, py=oy+d.r*stepY;
+    const dx=(px-cx)/(gw/2), dy=(py-cy)/(gw/2);
+    const dist=Math.hypot(dx,dy), angle=Math.atan2(dy,dx);
+    if(dist>1.0) continue;
+    const res=state==='idle'?aIdle(d,dist,angle,T,col)
+      :state==='listening'?aListening(d,dist,angle,T,col,amp)
+      :state==='thinking'?aThinking(d,dist,angle,T,col)
+      :state==='speaking'?aSpeaking(d,dist,angle,T,col,amp)
+      :aError(d,dist,angle,T,col);
+    const alpha=Math.max(0,Math.min(1,res.alpha)), radius=Math.max(.2,res.radius)*baseR;
+    let cr=res.cr!==undefined?res.cr:col.r, cg=res.cg!==undefined?res.cg:col.g, cb=res.cb!==undefined?res.cb:col.b;
+    if(alpha<.01) continue;
+    
+    // Soft outer glow
+    const g=ctx.createRadialGradient(px,py,0,px,py,radius*4);
+    g.addColorStop(0,rgba({r:cr,g:cg,b:cb},alpha*.65));
+    g.addColorStop(.45,rgba({r:cr,g:cg,b:cb},alpha*.12));
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(px,py,radius*4,0,Math.PI*2); ctx.fill();
+    
+    // Core dot
+    ctx.fillStyle=rgba({r:cr,g:cg,b:cb},Math.min(1,alpha*2.4));
+    ctx.beginPath(); ctx.arc(px,py,radius,0,Math.PI*2); ctx.fill();
+  }
+  
+  // Connection lines (thinking state only)
+  if(state==='thinking'){
+    ctx.save();
+    for(let i=0;i<dots.length-1;i+=3){
+      const d1=dots[i], p1x=ox+d1.c*stepX, p1y=oy+d1.r*stepY;
+      if(Math.hypot((p1x-cx)/(gw/2),(p1y-cy)/(gw/2))>.90) continue;
+      for(let j=i+1;j<Math.min(i+12,dots.length);j++){
+        const d2=dots[j], p2x=ox+d2.c*stepX, p2y=oy+d2.r*stepY;
+        if(Math.hypot(p1x-p2x,p1y-p2y)>stepX*1.7) continue;
+        if(Math.hypot((p2x-cx)/(gw/2),(p2y-cy)/(gw/2))>.90) continue;
+        ctx.strokeStyle=rgba(col,.04+.14*(Math.sin(T*3+d1.phase-d2.phase)+1)*.5);
+        ctx.lineWidth=.8; ctx.beginPath(); ctx.moveTo(p1x,p1y); ctx.lineTo(p2x,p2y); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+}
+
+function updateAudio(state){
+  // Use delta-time based increment to sync with grid animation (use T directly instead of simPhase)
+  amp=(state==='listening'||state==='speaking')
+    ?Math.max(0,.2+.8*Math.pow(Math.sin(T*2.5),2)*Math.abs(Math.sin(T*4.5)))
+    :amp*.88;
+  document.querySelectorAll('.ab').forEach((b,i)=>{
+    b.style.height=((state==='listening'||state==='speaking')?Math.max(3,15*Math.abs(Math.sin(T*3.5+i*.5))):3)+'px';
+  });
+}
+
+let last=performance.now();
+function loop(now){
+  const dt=Math.min((now-last)/1000,.05); last=now; T+=dt;
+  // ← Enhanced blending: ease-out curve for smoother transitions
+  if(blend<1) {
+    const easeOut = 1 - Math.pow(1 - blend, 2.5);  // Ease-out curve
+    blend = Math.min(1, blend + dt * 2.8);
+  }
+  const eff=blend>.5?tgtState:curState;
+  updateAudio(eff);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  drawGrid(eff,T,amp);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+updateUI('idle');
+
+// CHAT
+function sanitizeReply(text){
+  let cleaned = text == null ? '' : String(text);
+  cleaned = cleaned
+    .replace(/<function[^>]*>[\s\S]*?<\/function>/gi, ' ')
+    .replace(/<function[^>]*>/gi, ' ')
+    .replace(/<\/function>/gi, ' ');
+  if (/<function/i.test(cleaned) && !/<\/function>/i.test(cleaned)) {
+    cleaned = cleaned.replace(/<function[\s\S]*$/i, '');
+  }
+  return cleaned.replace(/\s+/g, ' ').trim();
+}
+
+let chatHistory = [];
+
+function addMsg(role,text,cls='',skipSave=false){
+  const d=document.createElement('div');
+  d.className=`msg ${role==='user'?'u':'j'} ${cls}`;
+  const clean = sanitizeReply(text);
+  d.textContent=clean;
+  const log=document.getElementById('log');
+  log.appendChild(d); log.scrollTop=log.scrollHeight;
+  
+  if (!skipSave && clean) {
+    chatHistory.push({role, text: clean});
+    if (chatHistory.length > 50) chatHistory.shift();
+    localStorage.setItem('jarvis_chat_history', JSON.stringify(chatHistory));
+  }
+  return d;
+}
+
+function loadChatHistory() {
+  try {
+    const saved = localStorage.getItem('jarvis_chat_history');
+    if (saved) {
+      const history = JSON.parse(saved);
+      history.forEach(m => addMsg(m.role, m.text, 'hist', true));
+      if (history.length > 0) {
+        addMsg('jarvis', 'Welcome back, sir. I have restored our previous conversation.', 'status', true);
+      }
+    }
+  } catch(e) { console.warn('Failed to load chat history', e); }
+}
+
+function clearChatHistory() {
+  if (confirm('Are you sure you want to clear the chat history?')) {
+    localStorage.removeItem('jarvis_chat_history');
+    chatHistory = [];
+    document.getElementById('log').innerHTML = '';
+    addMsg('jarvis', 'Chat history cleared.', 'status');
+  }
+}
+
+function localFallback(msg){
+  const m=msg.toLowerCase();
+  if(m.includes('hello')||m.includes('hi')) return "Hi! I'm Jarvis. Server is offline.";
+  if(m.includes('time')) return `It's ${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}.`;
+  if(m.includes('date')) return `Today is ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}.`;
+  return 'Server offline. Start jarvis_grid_server.py for full AI.';
+}
+
+// pollTTS — SSE tts_done is primary; this polls backend speech state as a
+// backup so the UI doesn't get stuck or reset too early if the event is missed.
+function pollTTS(delay=1200){
+  if (ttsSyncTimer) clearTimeout(ttsSyncTimer);
+  ttsSyncTimer = setTimeout(async ()=>{
+    try{
+      const r = await fetch(`${API}/api/tts_status`, {
+        method:'POST',
+        body:'{}',
+        headers:{'Content-Type':'application/json'}
+      });
+      const d = await r.json();
+      if (d && d.speaking) {
+        setState('speaking');
+        busy = true;
+        armSpeechWatchdog();
+        pollTTS(900);
+        return;
+      }
+    }catch{}
+    if (tgtState==='speaking' || tgtState==='thinking') {
+      clearSpeechWatchdog();
+      setState('idle');
+      busy=false;
+    }
+  }, delay);
+}
+
+function armSpeechWatchdog(ms=12000) {
+  if (speechWatchdog) clearTimeout(speechWatchdog);
+  speechWatchdog = setTimeout(() => {
+    if (tgtState === 'speaking') {
+      setState('idle');
+      busy = false;
+    }
+  }, ms);
+}
+
+function clearSpeechWatchdog() {
+  if (speechWatchdog) {
+    clearTimeout(speechWatchdog);
+    speechWatchdog = null;
+  }
+}
+
+async function send(msg){
+  if(!msg.trim()||busy) return;
+  busy=true; addMsg('user',msg); setState('thinking');
+  const sb=document.getElementById('sb'); sb.classList.add('loading');
+  const loadEl=addMsg('jarvis','...','loading');
+  try{
+    const res=await fetch(`${API}/api/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
+    const data=await res.json();
+    const reply=sanitizeReply(data.reply||data.error||'No response.');
+    loadEl.remove();
+    setState('thinking');
+    addMsg('jarvis',reply);
+    if (typeof data.wake_active === 'boolean') setWakeWordUi(data.wake_active);
+    pollTTS();
+  }catch(e){
+    loadEl.remove(); setState('speaking'); addMsg('jarvis',localFallback(msg));
+    setTimeout(()=>{setState('idle');busy=false;},2000);
+  } finally {
+    sb.classList.remove('loading');
+    // Always ensure busy resets after a reasonable time (defensive)
+    setTimeout(()=>{ if(busy) busy=false; }, 15000);
+  }
+}
+
+document.getElementById('sb').addEventListener('click',()=>{ const i=document.getElementById('inp'); send(i.value); i.value=''; });
+document.getElementById('inp').addEventListener('keydown',e=>{ if(e.key==='Enter'){send(e.target.value);e.target.value='';} });
+
+// MIC — Interrupt & Listen
+document.getElementById('mb').addEventListener('click',async()=>{
+  if(micActive) return;
+  micActive=true; busy=true;
+  const mb=document.getElementById('mb');
+  mb.classList.add('rec'); setState('listening');
+  try{
+    // First: Interrupt any current speech
+    await fetch(`${API}/api/tts_stop`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}' }).catch(()=>{});
+    
+    // Then: Listen for voice command
+    const res=await fetch(`${API}/api/listen`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}' });
+    const data=await res.json();
+    if(data.error&&!data.transcript){
+      setState('error'); addMsg('jarvis',data.error||'No speech detected.');
+      setTimeout(()=>{setState('idle');busy=false;},2000);
+    } else {
+      if(data.transcript) addMsg('user',data.transcript);
+      setState('thinking');
+      const loadEl=addMsg('jarvis','...','loading');
+      setTimeout(()=>{ 
+        loadEl.remove(); 
+        setState('thinking'); 
+        addMsg('jarvis',sanitizeReply(data.reply||'...')); 
+        if (typeof data.wake_active === 'boolean') setWakeWordUi(data.wake_active);
+        pollTTS();
+      },400);
+    }
+  }catch(e){
+    setState('error'); addMsg('jarvis','Mic error - is the server running?');
+    setTimeout(()=>{setState('idle');busy=false;},2500);
+  } finally{
+    micActive=false; mb.classList.remove('rec');
+    setTimeout(()=>{ if(busy && tgtState!=='speaking') { setState('idle'); busy=false; } }, 12000);
+  }
+});
+
+// GRID CLICK — Alternative way to interrupt & listen (click anywhere on the visualizer)
+document.getElementById('cv').addEventListener('click',async()=>{
+  if(micActive) return;
+  micActive=true; busy=true;
+  const mb=document.getElementById('mb');
+  mb.classList.add('rec'); setState('listening');
+  try{
+    // First: Interrupt any current speech
+    await fetch(`${API}/api/tts_stop`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}' }).catch(()=>{});
+    
+    // Then: Listen for voice command
+    const res=await fetch(`${API}/api/listen`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}' });
+    const data=await res.json();
+    if(data.error&&!data.transcript){
+      setState('error'); addMsg('jarvis',data.error||'No speech detected.');
+      setTimeout(()=>{setState('idle');busy=false;},2000);
+    } else {
+      if(data.transcript) addMsg('user',data.transcript);
+      setState('thinking');
+      const loadEl=addMsg('jarvis','...','loading');
+      setTimeout(()=>{ 
+        loadEl.remove(); 
+        setState('thinking'); 
+        addMsg('jarvis',sanitizeReply(data.reply||'...')); 
+        if (typeof data.wake_active === 'boolean') setWakeWordUi(data.wake_active);
+        pollTTS();
+      },400);
+    }
+  }catch(e){
+    setState('error'); addMsg('jarvis','Mic error - is the server running?');
+    setTimeout(()=>{setState('idle');busy=false;},2500);
+  } finally{
+    micActive=false; mb.classList.remove('rec');
+    setTimeout(()=>{ if(busy && tgtState!=='speaking') { setState('idle'); busy=false; } }, 12000);
+  }
+});
+
+// CLEAR
+document.getElementById('clr').addEventListener('click',async()=>{
+  await fetch(`${API}/api/clear`,{method:'POST',body:'{}',headers:{'Content-Type':'application/json'}}).catch(()=>{});
+  document.getElementById('log').innerHTML=''; addMsg('jarvis','Memory cleared.');
+});
+
+// VIEW SWITCHER
+function switchView(v){
+  if (currentView === 'vision' && v !== 'vision') {
+    stopVisionPreview();
+  }
+  document.querySelectorAll('#vtabs .tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v));
+  Object.keys(views).forEach(k=>document.getElementById(views[k]).style.display=k===v?'':'none');
+  currentView = v;
+  if(v==='system')   loadSystemStats();
+  if(v==='voice')    loadVoiceProfiles();
+  if(v==='booking')  { loadMemoryPrefs(); loadMovies(); }
+  if(v==='calendar') loadCalendar();
+  if(v==='memory')   loadMemory();
+  if(v==='vision')   { loadMemoryPrefs(); startVisionPreview(); }
+}
+document.querySelectorAll('#vtabs .tab').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.v)));
+
+// HAMBURGER
+function openMenu(){document.getElementById('menu-overlay').classList.add('open');document.getElementById('menu-drawer').classList.add('open');}
+function closeMenu(){document.getElementById('menu-overlay').classList.remove('open');document.getElementById('menu-drawer').classList.remove('open');}
+document.getElementById('menu-btn').addEventListener('click',openMenu);
+document.getElementById('menu-overlay').addEventListener('click',closeMenu);
+document.getElementById('m-chat').addEventListener('click',()=>{switchView('chat');closeMenu();});
+document.getElementById('m-vision').addEventListener('click',()=>{switchView('vision');closeMenu();});
+document.getElementById('m-booking').addEventListener('click',()=>{switchView('booking');closeMenu();});
+document.getElementById('m-messages').addEventListener('click',()=>{switchView('messages');closeMenu();});
+document.getElementById('m-system').addEventListener('click',()=>{switchView('system');closeMenu();});
+document.getElementById('m-voice').addEventListener('click',()=>{switchView('voice');closeMenu();});
+document.getElementById('m-games').addEventListener('click',()=>{switchView('games');closeMenu();});
+document.getElementById('m-calendar').addEventListener('click',()=>{switchView('calendar');closeMenu();});
+document.getElementById('m-memory').addEventListener('click',()=>{switchView('memory');closeMenu();});
+document.getElementById('m-smarthome').addEventListener('click',()=>{switchView('smarthome');closeMenu();});
+document.getElementById('m-desktop').addEventListener('click',()=>{switchView('desktop');closeMenu();});
+document.getElementById('m-clr2').addEventListener('click',async()=>{
+  await fetch(`${API}/api/clear`,{method:'POST',body:'{}',headers:{'Content-Type':'application/json'}}).catch(()=>{});
+  document.getElementById('log').innerHTML=''; addMsg('jarvis','Memory cleared.'); closeMenu();
+});
+document.getElementById('menu-clear-chat').addEventListener('click', () => {
+  clearChatHistory();
+  closeMenu();
+});
+document.getElementById('m-tts-stop').addEventListener('click',async()=>{
+  await fetch(`${API}/api/tts_stop`,{method:'POST',body:'{}',headers:{'Content-Type':'application/json'}}).catch(()=>{});
+  setState('idle'); busy=false; closeMenu();
+});
+
+let sttLang='en';
+document.getElementById('m-lang').addEventListener('click',async()=>{
+  sttLang=sttLang==='en'?'ta':'en';
+  await fetch(`${API}/api/stt_lang`,{method:'POST',body:JSON.stringify({lang:sttLang}),headers:{'Content-Type':'application/json'}}).catch(()=>{});
+  document.getElementById('m-lang').textContent=sttLang==='ta'?'🌐 Language: Tamil':'🌐 Language: English';
+  closeMenu();
+});
+document.getElementById('m-wake').addEventListener('click',async()=>{
+  const next = !wakeOn;
+  const resp = await fetch(`${API}/api/wake`,{method:'POST',body:JSON.stringify({action:next?'start':'stop'}),headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const data = resp ? await resp.json().catch(()=>({})) : {};
+  if (data.ok || typeof data.wake_active === 'boolean') {
+    setWakeWordUi(!!data.wake_active);
+  } else {
+    document.getElementById('sys-out').textContent = data.error || 'Wake word toggle failed.';
+  }
+  closeMenu();
+});
+
+// DARK MODE TOGGLE
+let darkMode = localStorage.getItem('jarvis_dark') === '1';
+function applyDark(on) {
+  document.body.classList.toggle('dark', on);
+  document.getElementById('m-dark').textContent = on ? '☀ Light Mode' : '🌙 Dark Mode';
+  localStorage.setItem('jarvis_dark', on ? '1' : '0');
+}
+applyDark(darkMode);
+document.getElementById('m-dark').addEventListener('click', () => {
+  darkMode = !darkMode; applyDark(darkMode); closeMenu();
+});
+// (loadChatHistory is called in DOMContentLoaded block below)
+
+// KEYBOARD SHORTCUT — Ctrl+M triggers mic
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm') {
+    e.preventDefault();
+    document.getElementById('mb').click();
+  }
+});
+
+// SSE — auto-reconnect with exponential backoff
+let _sseRetryDelay = 2000;
+function _connectSSE() {
+  const es = new EventSource(`${API}/api/events`);
+  es.addEventListener('tts_start', () => { setState('speaking'); busy = true; armSpeechWatchdog(6000); });
+  es.addEventListener('tts_done',  () => { clearSpeechWatchdog(); setState('idle'); busy = false; });
+  es.addEventListener('wake',      d  => { try { const p = JSON.parse(d.data); if (p.state === 'listening') { setState('listening'); busy = true; } } catch{} });
+  es.addEventListener('stt',       d  => { try { const p = JSON.parse(d.data); if (p.text) addMsg('user', p.text); } catch{} });
+  es.addEventListener('reply',     d  => { try { const p = JSON.parse(d.data); if (p.text) { addMsg('jarvis', sanitizeReply(p.text)); setState('thinking'); pollTTS(); } } catch{} });
+  es.addEventListener('wake_state',d  => { try { const p = JSON.parse(d.data); setWakeWordUi(!!p.active); } catch{} });
+  es.onerror = () => {
+    es.close();
+    setTimeout(_connectSSE, _sseRetryDelay);
+    _sseRetryDelay = Math.min(_sseRetryDelay * 1.5, 30000);
+  };
+  es.onopen = () => { _sseRetryDelay = 2000; };
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  loadChatHistory();
+  _connectSSE();
+});
+
+// SERVER STATUS CHECK — show offline banner if server unreachable
+async function checkServerStatus() {
+  try {
+    const r = await fetch(`${API}/api/status`, { method:'POST', body:'{}', headers:{'Content-Type':'application/json'} });
+    const d = await r.json();
+    document.getElementById('offline-banner').classList.remove('show');
+    // Sync wake state on load
+    if (typeof d.wake_active === 'boolean') setWakeWordUi(d.wake_active);
+    // Update version in footer
+    if (d.ai_mode) document.getElementById('fver').textContent = `v2.1 · ${d.ai_mode}`;
+  } catch {
+    document.getElementById('offline-banner').classList.add('show');
+  }
+}
+setTimeout(checkServerStatus, 2000);
+// Re-check every 30s
+setInterval(checkServerStatus, 30000);
+
+// SYSTEM
+async function loadSystemStats(){
+  const el=document.getElementById('sys-out'); el.textContent='Loading...';
+  try{
+    const r=await fetch(`${API}/api/system`,{method:'POST',body:JSON.stringify({query:'all'}),headers:{'Content-Type':'application/json'}});
+    const d=await r.json(); el.textContent=d.result||'No data.';
+  }catch{el.textContent='Server offline.';}
+}
+document.getElementById('sys-refresh').addEventListener('click',loadSystemStats);
+document.getElementById('sys-wake').addEventListener('click',async()=>{
+  const next = !wakeOn;
+  const resp = await fetch(`${API}/api/wake`,{method:'POST',body:JSON.stringify({action:next?'start':'stop'}),headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const data = resp ? await resp.json().catch(()=>({})) : {};
+  if (data.ok || typeof data.wake_active === 'boolean') {
+    setWakeWordUi(!!data.wake_active);
+  } else {
+    document.getElementById('sys-out').textContent = data.error || 'Wake word toggle failed.';
+  }
+});
+
+// VOICE ID
+async function loadVoiceProfiles(){
+  try{
+    const r=await fetch(`${API}/api/status`,{method:'POST',body:'{}',headers:{'Content-Type':'application/json'}});
+    const d=await r.json();
+    const p=d.voice_profiles||[];
+    document.getElementById('vid-out').textContent=p.length?'Enrolled: '+p.join(', '):'No profiles enrolled.';
+  }catch{document.getElementById('vid-out').textContent='Server offline.';}
+}
+document.getElementById('enroll-btn').addEventListener('click',async()=>{
+  const name=document.getElementById('enroll-name').value.trim();
+  if(!name){document.getElementById('vid-out').textContent='Enter a name first.';return;}
+  document.getElementById('vid-out').textContent=`Recording 4s for "${name}"... speak now.`;
+  setState('listening');
+  try{
+    const r=await fetch(`${API}/api/enroll`,{method:'POST',body:JSON.stringify({name,duration:4}),headers:{'Content-Type':'application/json'}});
+    const d=await r.json();
+    document.getElementById('vid-out').textContent=d.ok?`Enrolled! Profiles: ${(d.profiles||[]).join(', ')}`:`Failed: ${d.error||'unknown'}`;
+    document.getElementById('enroll-name').value='';
+  }catch{document.getElementById('vid-out').textContent='Server offline.';}
+  finally{setState('idle');}
+});
+
+// GAMES
+let _gameMode = null;
+document.querySelectorAll('[data-game]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const action = btn.dataset.game;
+    _gameMode = action;
+    const r = await fetch(`${API}/api/game`, {method:'POST', body:JSON.stringify({action}), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+    const d = r ? await r.json() : {result:'Server offline.'};
+    document.getElementById('game-out').textContent = d.result || '';
+    setState('speaking'); setTimeout(pollTTS, 1200);
+  });
+});
+document.getElementById('game-ans-btn').addEventListener('click', async () => {
+  const ans = document.getElementById('game-inp').value.trim();
+  if (!ans) return;
+  const action = _gameMode === 'number' ? 'guess' : 'answer';
+  const payload = _gameMode === 'number' ? {action, guess: parseInt(ans)||0} : {action, answer: ans};
+  const r = await fetch(`${API}/api/game`, {method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('game-out').textContent = d.result || '';
+  document.getElementById('game-inp').value = '';
+  setState('speaking'); setTimeout(pollTTS, 1200);
+});
+
+// BOOKING
+let _book = { movie_id:'', movie_title:'', venue_id:'', venue_name:'', show_id:'', show_time:'', price:'' };
+
+function _bookCity() {
+  return (document.getElementById('book-city').value.trim() || 'Chennai');
+}
+
+async function loadMovies() {
+  const sel = document.getElementById('book-movie');
+  sel.innerHTML = '<option value="">Loading...</option>';
+  document.getElementById('book-step2').style.display = 'none';
+  document.getElementById('book-step3').style.display = 'none';
+  document.getElementById('book-step4').style.display = 'none';
+  try {
+    const r = await fetch(`${API}/api/booking`, {method:'POST',
+      body:JSON.stringify({action:'list', city:_bookCity()}),
+      headers:{'Content-Type':'application/json'}});
+    const d = await r.json();
+    sel.innerHTML = '<option value="">Select a movie...</option>';
+    (d.movies||[]).forEach(m => {
+      const o = document.createElement('option');
+      o.value = m.id;
+      o.textContent = `${m.title}${m.language?' ('+m.language+')':''}${m.rating?' ★'+m.rating:''}`;
+      o.dataset.title = m.title;
+      sel.appendChild(o);
+    });
+    if ((d.movies||[]).length) {
+      const src = d.source === 'live'
+        ? 'live BookMyShow'
+        : d.source === 'demo'
+          ? 'demo booking data'
+          : 'live booking unavailable';
+      document.getElementById('book-out').textContent =
+        `${(d.movies||[]).length} movies from ${src}.`;
+    } else {
+      document.getElementById('book-out').textContent =
+        d.error || 'Live booking data is unavailable right now.';
+    }
+  } catch { document.getElementById('book-out').textContent = 'Server offline.'; }
+}
+
+document.getElementById('book-city-btn').addEventListener('click', loadMovies);
+
+document.getElementById('book-movie').addEventListener('change', async function() {
+  const opt = this.options[this.selectedIndex];
+  if (!opt.value) return;
+  _book.movie_id    = opt.value;
+  _book.movie_title = opt.dataset.title || opt.textContent;
+  document.getElementById('book-step2').style.display = '';
+  document.getElementById('book-step3').style.display = 'none';
+  document.getElementById('book-step4').style.display = 'none';
+  const sel = document.getElementById('book-theater');
+  sel.innerHTML = '<option value="">Loading theaters...</option>';
+  try {
+    const r = await fetch(`${API}/api/booking`, {method:'POST',
+      body:JSON.stringify({action:'theaters', movie_id:_book.movie_id, city:_bookCity()}),
+      headers:{'Content-Type':'application/json'}});
+    const d = await r.json();
+    sel.innerHTML = '<option value="">Select theater...</option>';
+    (d.theaters||[]).forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.id;
+      o.textContent = `${t.name}${t.location?' — '+t.location:''}${t.distance?' ('+t.distance+')':''}`;
+      o.dataset.name = t.name;
+      sel.appendChild(o);
+    });
+    if (!(d.theaters||[]).length) {
+      document.getElementById('book-out').textContent = d.error || 'No live theaters available.';
+    }
+  } catch { sel.innerHTML = '<option>Error loading theaters</option>'; }
+});
+
+document.getElementById('book-theater').addEventListener('change', async function() {
+  const opt = this.options[this.selectedIndex];
+  if (!opt.value) return;
+  _book.venue_id   = opt.value;
+  _book.venue_name = opt.dataset.name || opt.textContent;
+  document.getElementById('book-step3').style.display = '';
+  document.getElementById('book-step4').style.display = 'none';
+  const container = document.getElementById('book-shows');
+  container.innerHTML = '<span style="font-size:11px;color:var(--sub)">Loading showtimes...</span>';
+  try {
+    const r = await fetch(`${API}/api/booking`, {method:'POST',
+      body:JSON.stringify({action:'showtimes', movie_id:_book.movie_id,
+        venue_id:_book.venue_id, city:_bookCity()}),
+      headers:{'Content-Type':'application/json'}});
+    const d = await r.json();
+    container.innerHTML = '';
+    if (!(d.showtimes||[]).length) {
+      container.innerHTML = '<span style="font-size:11px;color:#DC2626">No live showtimes available.</span>';
+      return;
+    }
+    (d.showtimes||[]).forEach(s => {
+      const btn = document.createElement('button');
+      btn.className = 'ib';
+      btn.style.cssText = 'width:auto;padding:4px 10px;font-size:10px;flex-direction:column;height:auto;gap:1px';
+      btn.innerHTML =
+        `<span style="font-weight:600">${s.time}</span>` +
+        `<span style="font-size:9px;color:var(--sub)">${s.price||''}${s.seats_left?' · '+s.seats_left+' seats':''}</span>`;
+      btn.addEventListener('click', () => selectShowtime(s));
+      container.appendChild(btn);
+    });
+    document.getElementById('book-out').textContent =
+      (d.showtimes||[]).length
+        ? `${(d.showtimes||[]).length} live showtimes at ${_book.venue_name}.`
+        : (d.error || 'No live showtimes available.');
+  } catch {
+    container.innerHTML = '<span style="font-size:11px;color:#DC2626">Error loading live showtimes.</span>';
+  }
+});
+
+async function selectShowtime(s) {
+  _book.show_id   = s.show_id;
+  _book.show_time = s.time;
+  _book.price     = s.price || '';
+  const seats = parseInt(document.getElementById('book-seats').value) || 1;
+
+  // Show step 4 immediately with summary
+  document.getElementById('book-step4').style.display = '';
+  const detail = `${_book.movie_title} · ${_book.show_time} · ${_book.venue_name}` +
+    `${_book.price ? ' · ' + _book.price : ''}${s.screen ? ' · ' + s.screen : ''}`;
+  document.getElementById('book-confirm-msg').textContent = `${seats} seat${seats>1?'s':''}`;
+  document.getElementById('book-confirm-detail').textContent = detail;
+
+  // Ask server for voice confirmation
+  const r = await fetch(`${API}/api/booking`, {method:'POST',
+    body:JSON.stringify({action:'confirm', movie:_book.movie_title,
+      theater:_book.venue_name, showtime:_book.show_time, seats}),
+    headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  if (r) {
+    const d = await r.json();
+    document.getElementById('book-out').textContent = d.summary || detail;
+  }
+  setState('speaking'); setTimeout(pollTTS, 1200);
+}
+
+document.getElementById('book-seats').addEventListener('change', function() {
+  // Re-render confirm detail with updated seat count if step4 is visible
+  if (document.getElementById('book-step4').style.display !== 'none') {
+    const seats = parseInt(this.value) || 1;
+    document.getElementById('book-confirm-msg').textContent = `${seats} seat${seats>1?'s':''}`;
+  }
+});
+
+document.getElementById('book-checkout-btn').addEventListener('click', async () => {
+  const seats = parseInt(document.getElementById('book-seats').value) || 1;
+  const r = await fetch(`${API}/api/booking`, {method:'POST',
+    body:JSON.stringify({action:'checkout',
+      movie_id:_book.movie_id, venue_id:_book.venue_id, show_id:_book.show_id,
+      movie:_book.movie_title, theater:_book.venue_name, showtime:_book.show_time,
+      seats}),
+    headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {};
+  if (d.url) {
+    // window.open works on both desktop and mobile browsers
+    window.open(d.url, '_blank', 'noopener');
+  }
+  document.getElementById('book-out').textContent =
+    d.result || 'Opening BookMyShow...';
+  document.getElementById('book-step4').style.display = 'none';
+  setState('speaking'); setTimeout(pollTTS, 1200);
+});
+
+document.getElementById('book-back-btn').addEventListener('click', () => {
+  document.getElementById('book-step4').style.display = 'none';
+  document.getElementById('book-out').textContent = 'Choose a different showtime.';
+});
+
+document.getElementById('music-btn').addEventListener('click', async () => {
+  const input = document.getElementById('music-input');
+  const query = (input ? input.value.trim() : '') || prompt('What would you like to listen to?');
+  if (!query) return;
+  if (input) input.value = '';
+  await fetch(`${API}/api/music`, {method:'POST', body:JSON.stringify({query}), headers:{'Content-Type':'application/json'}}).catch(()=>{});
+  setState('speaking'); setTimeout(pollTTS, 1200);
+});
+
+
+// CALENDAR
+let _calPending = null;
+async function loadCalendar(action='today') {
+  const el = document.getElementById('cal-out');
+  el.textContent = 'Loading...';
+  try {
+    const r = await fetch(`${API}/api/calendar`, {method:'POST',
+      body:JSON.stringify({action, speak:false}), headers:{'Content-Type':'application/json'}});
+    const d = await r.json();
+    el.textContent = d.result || 'No data.';
+    if (!d.connected) el.textContent += ' (Calendar not connected)';
+  } catch { el.textContent = 'Server offline.'; }
+}
+document.querySelectorAll('[data-cal]').forEach(btn => {
+  btn.addEventListener('click', () => loadCalendar(btn.dataset.cal));
+});
+document.getElementById('cal-add-btn').addEventListener('click', () => {
+  const summary = document.getElementById('cal-summary').value.trim();
+  const when    = document.getElementById('cal-when').value.trim();
+  if (!summary) { document.getElementById('cal-out').textContent = 'Enter event title.'; return; }
+  _calPending = {summary, when: when || 'tomorrow 10am'};
+  document.getElementById('cal-confirm-msg').textContent =
+    `Add "${summary}" on ${when || 'tomorrow 10am'}?`;
+  document.getElementById('cal-confirm-bar').style.display = '';
+});
+document.getElementById('cal-yes-btn').addEventListener('click', async () => {
+  document.getElementById('cal-confirm-bar').style.display = 'none';
+  if (!_calPending) return;
+  const r = await fetch(`${API}/api/calendar`, {method:'POST',
+    body:JSON.stringify({action:'add', summary:_calPending.summary,
+      when:_calPending.when, speak:true}),
+    headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('cal-out').textContent = d.result || '';
+  document.getElementById('cal-summary').value = '';
+  document.getElementById('cal-when').value = '';
+  _calPending = null;
+  setState('speaking'); setTimeout(pollTTS, 1200);
+});
+document.getElementById('cal-no-btn').addEventListener('click', () => {
+  document.getElementById('cal-confirm-bar').style.display = 'none';
+  document.getElementById('cal-out').textContent = 'Cancelled.';
+  _calPending = null;
+});
+
+// MEMORY
+
+// SMART HOME
+let _homePending = null;
+document.querySelectorAll('[data-scene]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _homePending = {action:'scene', scene:btn.dataset.scene};
+    document.getElementById('home-confirm-msg').textContent =
+      `Activate "${btn.dataset.scene}" scene?`;
+    document.getElementById('home-confirm-bar').style.display = '';
+  });
+});
+document.getElementById('home-send-btn').addEventListener('click', () => {
+  const cmd = document.getElementById('home-cmd').value.trim();
+  if (!cmd) return;
+  _homePending = {action:'control', command:cmd};
+  document.getElementById('home-confirm-msg').textContent = `Run: "${cmd}"?`;
+  document.getElementById('home-confirm-bar').style.display = '';
+});
+document.getElementById('home-yes-btn').addEventListener('click', async () => {
+  document.getElementById('home-confirm-bar').style.display = 'none';
+  if (!_homePending) return;
+  const r = await fetch(`${API}/api/smarthome`, {method:'POST',
+    body:JSON.stringify(_homePending), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('home-out').textContent = d.result || d.error || '';
+  document.getElementById('home-cmd').value = '';
+  _homePending = null;
+  setState('speaking'); setTimeout(pollTTS, 1200);
+});
+document.getElementById('home-no-btn').addEventListener('click', () => {
+  document.getElementById('home-confirm-bar').style.display = 'none';
+  document.getElementById('home-out').textContent = 'Cancelled.';
+  _homePending = null;
+});
+document.getElementById('home-list-btn').addEventListener('click', async () => {
+  const r = await fetch(`${API}/api/smarthome`, {method:'POST',
+    body:JSON.stringify({action:'list'}), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('home-out').textContent = d.result || d.error || '';
+});
+
+document.getElementById('dev-add-btn').addEventListener('click', async () => {
+  const name   = document.getElementById('dev-name').value.trim();
+  const ip     = document.getElementById('dev-ip').value.trim();
+  const dtype  = document.getElementById('dev-type').value;
+  const entity = document.getElementById('dev-hass-entity').value.trim();
+  if (!name) { document.getElementById('home-out').textContent = 'Enter a device name.'; return; }
+  const r = await fetch(`${API}/api/smarthome`, {method:'POST',
+    body:JSON.stringify({action:'add_device', name, ip, device_type:dtype, hass_entity:entity}),
+    headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('home-out').textContent = d.result || d.error || '';
+  document.getElementById('dev-name').value = '';
+  document.getElementById('dev-ip').value = '';
+  document.getElementById('dev-hass-entity').value = '';
+});
+
+document.getElementById('dev-remove-btn').addEventListener('click', async () => {
+  const name = document.getElementById('dev-name').value.trim();
+  if (!name) { document.getElementById('home-out').textContent = 'Enter the device name to remove.'; return; }
+  const r = await fetch(`${API}/api/smarthome`, {method:'POST',
+    body:JSON.stringify({action:'remove_device', name}),
+    headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('home-out').textContent = d.result || d.error || '';
+  document.getElementById('dev-name').value = '';
+});
+
+// DESKTOP
+let _deskPending = null;
+async function runDesktop(cmd) {
+  const r = await fetch(`${API}/api/desktop`, {method:'POST',
+    body:JSON.stringify({action:'command', command:cmd}),
+    headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  return r ? await r.json() : {result:'Server offline.'};
+}
+document.getElementById('desk-send-btn').addEventListener('click', () => {
+  const cmd = document.getElementById('desk-cmd').value.trim();
+  if (!cmd) return;
+  _deskPending = cmd;
+  document.getElementById('desk-run-confirm-msg').textContent = `Run: "${cmd}"?`;
+  document.getElementById('desk-run-confirm-bar').style.display = '';
+});
+document.getElementById('desk-run-yes-btn').addEventListener('click', async () => {
+  document.getElementById('desk-run-confirm-bar').style.display = 'none';
+  if (!_deskPending) return;
+  const d = await runDesktop(_deskPending);
+  document.getElementById('desk-out').textContent = d.result || d.error || '';
+  document.getElementById('desk-cmd').value = '';
+  _deskPending = null;
+});
+document.getElementById('desk-run-no-btn').addEventListener('click', () => {
+  document.getElementById('desk-run-confirm-bar').style.display = 'none';
+  document.getElementById('desk-out').textContent = 'Cancelled.';
+  _deskPending = null;
+});
+document.getElementById('desk-windows-btn').addEventListener('click', async () => {
+  const r = await fetch(`${API}/api/desktop`, {method:'POST', body:JSON.stringify({action:'windows'}), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('desk-out').textContent = d.result || '';
+});
+document.getElementById('desk-clipboard-btn').addEventListener('click', async () => {
+  const d = await runDesktop('read clipboard');
+  document.getElementById('desk-out').textContent = d.result || '';
+});
+document.getElementById('desk-recent-btn').addEventListener('click', async () => {
+  const r = await fetch(`${API}/api/desktop`, {method:'POST', body:JSON.stringify({action:'recent'}), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('desk-out').textContent = d.result || '';
+});
+
+// WEB SEARCH + CONFIRMATION
+document.getElementById('web-search-btn').addEventListener('click', async () => {
+  const query = document.getElementById('web-cmd').value.trim();
+  const site  = document.getElementById('web-site').value;
+  if (!query) return;
+  const cmd = site === 'google' ? `google ${query}` : `search ${query} on ${site}`;
+  const r = await fetch(`${API}/api/web`, {method:'POST', body:JSON.stringify({action:'command', command:cmd}), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('desk-out').textContent = d.result || '';
+  document.getElementById('web-cmd').value = '';
+  if (d.needs_confirm) {
+    document.getElementById('desk-confirm-msg').textContent = d.confirm_prompt;
+    document.getElementById('desk-confirm-bar').style.display = '';
+    setState('speaking'); setTimeout(pollTTS, 1200);
+  }
+});
+document.getElementById('desk-yes-btn').addEventListener('click', async () => {
+  const r = await fetch(`${API}/api/web`, {method:'POST', body:JSON.stringify({action:'confirm'}), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('desk-out').textContent = d.result || '';
+  document.getElementById('desk-confirm-bar').style.display = 'none';
+  setState('speaking'); setTimeout(pollTTS, 1200);
+});
+document.getElementById('desk-no-btn').addEventListener('click', async () => {
+  await fetch(`${API}/api/web`, {method:'POST', body:JSON.stringify({action:'cancel'}), headers:{'Content-Type':'application/json'}}).catch(()=>{});
+  document.getElementById('desk-confirm-bar').style.display = 'none';
+  document.getElementById('desk-out').textContent = 'Cancelled.';
+});
+
+
+function setVisionBadge(text, live=false) {
+  if (!visBadge) return;
+  visBadge.textContent = text;
+  visBadge.style.background = live ? 'rgba(5,150,105,.88)' : 'rgba(15,23,42,.8)';
+  visBadge.style.color = live ? '#ECFDF5' : '#E2E8F0';
+}
+
+function setWakeWordUi(active) {
+  wakeOn = !!active;
+  document.getElementById('m-wake').textContent = `\u{1F3A4} Wake Word: ${wakeOn ? 'ON' : 'OFF'}`;
+  document.getElementById('sys-wake').textContent = `Wake Word: ${wakeOn ? 'ON' : 'OFF'}`;
+  document.getElementById('sys-wake').style.color = wakeOn ? '#059669' : '';
+}
+
+let _visionFacing = 'environment'; // rear camera default on mobile
+
+async function startVisionPreview() {
+  if (visionStream) return visionStream;
+
+  // Show permission overlay first on mobile
+  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+  const overlay = document.getElementById('vis-perm-overlay');
+  if (overlay && !isMobile) overlay.style.display = 'none';
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setVisionBadge('Camera unsupported');
+    document.getElementById('vis-out').textContent = 'Camera not supported. Use Upload instead.';
+    return null;
+  }
+
+  // Show permission overlay on mobile before requesting
+  if (isMobile && overlay) {
+    overlay.style.display = 'flex';
+    await new Promise(resolve => {
+      document.getElementById('vis-perm-btn').onclick = () => {
+        overlay.style.display = 'none';
+        resolve();
+      };
+    });
+  }
+
+  try {
+    visionStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: _visionFacing } },
+      audio: false
+    });
+    const vid = document.getElementById('vis-preview');
+    const img = document.getElementById('vis-img-preview');
+    if (vid) { vid.style.display = 'block'; vid.srcObject = visionStream; await vid.play().catch(()=>{}); }
+    if (img) img.style.display = 'none';
+    if (overlay) overlay.style.display = 'none';
+    setVisionBadge(_visionFacing === 'environment' ? 'Rear camera' : 'Front camera', true);
+    document.getElementById('vis-out').textContent = 'Live. FREE: Read Text / Scan QR. CLOUD: Analyze.';
+    return visionStream;
+  } catch (err) {
+    visionStream = null;
+    if (overlay) overlay.style.display = 'none';
+    setVisionBadge('Camera blocked');
+    // On block, show file upload hint
+    document.getElementById('vis-out').textContent =
+      `Camera blocked: ${err.message}. Use Upload to pick a photo instead.`;
+    return null;
+  }
+}
+
+function stopVisionPreview() {
+  if (visionStream) { visionStream.getTracks().forEach(t => t.stop()); visionStream = null; }
+  const vid = document.getElementById('vis-preview');
+  if (vid) vid.srcObject = null;
+  setVisionBadge('Camera off', false);
+}
+
+async function flipCamera() {
+  _visionFacing = _visionFacing === 'environment' ? 'user' : 'environment';
+  stopVisionPreview();
+  await startVisionPreview();
+}
+
+// Capture a frame from live video OR the uploaded image preview
+function _grabCurrentFrame() {
+  const vid = document.getElementById('vis-preview');
+  const img = document.getElementById('vis-img-preview');
+  const canvas = document.getElementById('vis-canvas');
+  if (!canvas) return null;
+
+  // Uploaded image path
+  if (img && img.style.display !== 'none' && img.src) {
+    canvas.width = img.naturalWidth || 640;
+    canvas.height = img.naturalHeight || 480;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.84).split(',')[1];
+  }
+
+  // Live video path
+  if (!vid || !vid.videoWidth) return null;
+  canvas.width = vid.videoWidth;
+  canvas.height = vid.videoHeight;
+  canvas.getContext('2d').drawImage(vid, 0, 0);
+  return canvas.toDataURL('image/jpeg', 0.84).split(',')[1];
+}
+
+async function captureVisionFrame(mode='free') {
+  // Ensure camera is running (or image is loaded)
+  const img = document.getElementById('vis-img-preview');
+  const hasUpload = img && img.style.display !== 'none' && img.src;
+  if (!hasUpload) await startVisionPreview();
+
+  const b64 = _grabCurrentFrame();
+  if (!b64) {
+    document.getElementById('vis-out').textContent = 'No frame available. Start camera or upload an image.';
+    return;
+  }
+
+  if (mode === 'free') {
+    // Local only — OCR the frame
+    await visionAction('frame', 'describe this snapshot', {
+      image_b64: b64,
+      prompt: 'Extract any visible text from this image.',
+      mode: 'free'
+    });
+    // Offer cloud upgrade via confirmation banner
+    document.getElementById('vis-confirm-msg').textContent =
+      'Want a richer description using Gemini? (uses cloud)';
+    document.getElementById('vis-confirm-bar').style.display = '';
+    // Store b64 for potential cloud follow-up
+    document.getElementById('vis-confirm-bar').dataset.b64 = b64;
+  } else {
+    document.getElementById('vis-confirm-bar').style.display = 'none';
+    await visionAction('analyze', 'analyze this snapshot', {
+      image_b64: b64,
+      prompt: 'Describe this image clearly and briefly.',
+      mode: 'cloud'
+    });
+  }
+}
+
+async function visionAction(action, cmd='', extra={}) {
+  document.getElementById('vis-out').textContent = 'Processing...';
+  setState('thinking');
+  const r = await fetch(`${API}/api/vision`, {
+    method:'POST',
+    body:JSON.stringify({action, command:cmd, ...extra}),
+    headers:{'Content-Type':'application/json'}
+  }).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('vis-out').textContent = d.result || d.error || '';
+  setState('speaking'); setTimeout(pollTTS, 1200);
+}
+
+// Button wiring
+document.getElementById('vis-camera-btn').addEventListener('click', () => startVisionPreview());
+document.getElementById('vis-flip-btn').addEventListener('click', flipCamera);
+document.getElementById('vis-stop-btn').addEventListener('click', () => {
+  stopVisionPreview();
+  document.getElementById('vis-out').textContent = 'Camera stopped.';
+});
+document.getElementById('vis-ocr-btn').addEventListener('click',  () => captureVisionFrame('free'));
+document.getElementById('vis-analyze-btn').addEventListener('click', () => captureVisionFrame('cloud'));
+document.getElementById('vis-screen-btn').addEventListener('click', () => visionAction('screen'));
+document.getElementById('vis-qr-btn').addEventListener('click', async () => {
+  // On mobile: grab frame and send to server QR decoder
+  const b64 = _grabCurrentFrame();
+  if (b64) {
+    await visionAction('frame', 'scan qr', { image_b64: b64, prompt: 'Decode any QR code in this image.', mode: 'free' });
+  } else {
+    await visionAction('qr'); // desktop screen scan fallback
+  }
+});
+
+// Upload fallback for Android WebView / blocked camera
+document.getElementById('vis-upload-btn').addEventListener('click', () => {
+  document.getElementById('vis-file-input').click();
+});
+document.getElementById('vis-file-input').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  stopVisionPreview();
+  const url = URL.createObjectURL(file);
+  const vid = document.getElementById('vis-preview');
+  const img = document.getElementById('vis-img-preview');
+  if (vid) vid.style.display = 'none';
+  if (img) { img.src = url; img.style.display = 'block'; }
+  setVisionBadge('Photo loaded', true);
+  document.getElementById('vis-out').textContent = 'Photo loaded. Tap Read Text (free) or Analyze (cloud).';
+});
+
+// Confirmation banner — cloud upgrade after free capture
+document.getElementById('vis-yes-btn').addEventListener('click', async () => {
+  const b64 = document.getElementById('vis-confirm-bar').dataset.b64;
+  document.getElementById('vis-confirm-bar').style.display = 'none';
+  if (b64) {
+    await visionAction('analyze', 'analyze this snapshot', {
+      image_b64: b64, prompt: 'Describe this image clearly and briefly.', mode: 'cloud'
+    });
+  }
+});
+document.getElementById('vis-no-btn').addEventListener('click', () => {
+  document.getElementById('vis-confirm-bar').style.display = 'none';
+});
+
+window.addEventListener('beforeunload', stopVisionPreview);
+
+// MESSAGES
+document.getElementById('msg-whatsapp-btn').addEventListener('click', async () => {
+  const r = await fetch(`${API}/api/callsms`, {method:'POST', body:JSON.stringify({action:'command', command:'open whatsapp'}), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('msg-out').textContent = d.result || '';
+});
+document.getElementById('msg-sms-btn').addEventListener('click', async () => {
+  const r = await fetch(`${API}/api/callsms`, {method:'POST', body:JSON.stringify({action:'command', command:'open messages'}), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('msg-out').textContent = d.result || '';
+});
+document.getElementById('msg-send-btn').addEventListener('click', async () => {
+  const contact = document.getElementById('msg-contact').value.trim();
+  const text    = document.getElementById('msg-text').value.trim();
+  if (!contact || !text) { document.getElementById('msg-out').textContent = 'Enter contact and message.'; return; }
+  const cmd = `reply to ${contact} saying ${text}`;
+  const r = await fetch(`${API}/api/callsms`, {method:'POST', body:JSON.stringify({action:'command', command:cmd}), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('msg-out').textContent = d.result || '';
+  if (d.needs_confirm) {
+    document.getElementById('msg-confirm-msg').textContent = d.confirm_prompt;
+    document.getElementById('msg-confirm-bar').style.display = '';
+    setState('speaking'); setTimeout(pollTTS, 1200);
+  }
+});
+document.getElementById('msg-yes-btn').addEventListener('click', async () => {
+  const r = await fetch(`${API}/api/web`, {method:'POST', body:JSON.stringify({action:'confirm'}), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+  const d = r ? await r.json() : {result:'Server offline.'};
+  document.getElementById('msg-out').textContent = d.result || '';
+  document.getElementById('msg-confirm-bar').style.display = 'none';
+  document.getElementById('msg-contact').value = '';
+  document.getElementById('msg-text').value = '';
+});
+document.getElementById('msg-no-btn').addEventListener('click', async () => {
+  await fetch(`${API}/api/web`, {method:'POST', body:JSON.stringify({action:'cancel'}), headers:{'Content-Type':'application/json'}}).catch(()=>{});
+  document.getElementById('msg-confirm-bar').style.display = 'none';
+  document.getElementById('msg-out').textContent = 'Cancelled.';
+});
+
+// MEMORY
+async function loadMemoryPrefs() {
+  try {
+    const r = await fetch(`${API}/api/memory`, {method:'POST',
+      body:JSON.stringify({action:'get'}), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+    const d = r ? await r.json() : {};
+    const p   = d.profile     || {};
+    const prf = d.preferences || {};
+    const city = prf.home_city || p.city || '';
+    const bookCity = document.getElementById('book-city');
+    if (bookCity && city && !bookCity.value) bookCity.value = city;
+    const bookSeats = document.getElementById('book-seats');
+    if (bookSeats && prf.usual_seats) bookSeats.value = prf.usual_seats;
+    if (prf.camera_mode) _visionFacing = prf.camera_mode === 'front' ? 'user' : 'environment';
+  } catch {}
+}
+
+function _memApi(body) {
+  return fetch(`${API}/api/memory`, {method:'POST',
+    body:JSON.stringify(body), headers:{'Content-Type':'application/json'}}).catch(()=>null);
+}
+
+function _setToggleActive(pref, val) {
+  document.querySelectorAll(`.mem-toggle[data-pref="${pref}"]`).forEach(b => {
+    const active = b.dataset.val === val;
+    b.style.background = active ? 'var(--accent,#0284C7)' : '';
+    b.style.color       = active ? '#fff' : '';
+    b.style.borderColor = active ? 'var(--accent,#0284C7)' : '';
+  });
+}
+
+async function loadMemory() {
+  try {
+    const r = await _memApi({action:'get'});
+    const d = r ? await r.json() : {};
+    const p   = d.profile      || {};
+    const prf = d.preferences  || {};
+    const places = d.places    || {};
+
+    // Profile
+    if (p.name) document.getElementById('mem-name').value = p.name;
+    if (p.city) document.getElementById('mem-city').value = p.city;
+
+    // Booking prefs
+    if (prf.fav_theater)  document.getElementById('mem-theater').value = prf.fav_theater;
+    if (prf.usual_seats)  document.getElementById('mem-seats').value   = prf.usual_seats;
+
+    // Toggle buttons
+    _setToggleActive('camera_mode',  prf.camera_mode  || 'rear');
+    _setToggleActive('cloud_vision', prf.cloud_vision || 'off');
+
+    // Apply camera_mode to vision tab immediately
+    if (prf.camera_mode) _visionFacing = prf.camera_mode === 'front' ? 'user' : 'environment';
+
+    // Summary line
+    const parts = [];
+    if (p.name)            parts.push(p.name);
+    if (p.city)            parts.push(p.city);
+    if (prf.fav_theater)   parts.push(`🎬 ${prf.fav_theater}`);
+    if (prf.usual_seats)   parts.push(`${prf.usual_seats} seats`);
+    if (prf.cloud_vision)  parts.push(`Vision: ${prf.cloud_vision === 'on' ? '☁ cloud' : '🔒 local'}`);
+    document.getElementById('mem-out').textContent =
+      parts.length ? parts.join(' · ') : 'No profile set yet.';
+
+    // Places
+    const placeEl = document.getElementById('mem-places');
+    placeEl.textContent = Object.keys(places).length
+      ? 'Places: ' + Object.entries(places).map(([k,v]) => `${k} → ${v.name}`).join(', ')
+      : '';
+  } catch { document.getElementById('mem-out').textContent = 'Server offline.'; }
+}
+
+document.getElementById('mem-save-btn').addEventListener('click', async () => {
+  const name = document.getElementById('mem-name').value.trim();
+  const city = document.getElementById('mem-city').value.trim();
+  await _memApi({action:'set_profile', name, city});
+  // Also persist home_city as a preference so booking tab can read it
+  if (city) await _memApi({action:'set_pref', key:'home_city', value:city});
+  document.getElementById('mem-out').textContent = `Saved: ${name}, ${city}`;
+  // Pre-fill booking city
+  const bookCity = document.getElementById('book-city');
+  if (bookCity && city) bookCity.value = city;
+});
+
+document.getElementById('mem-booking-btn').addEventListener('click', async () => {
+  const theater = document.getElementById('mem-theater').value.trim();
+  const seats   = parseInt(document.getElementById('mem-seats').value) || 1;
+  if (theater) await _memApi({action:'set_pref', key:'fav_theater', value:theater});
+  await _memApi({action:'set_pref', key:'usual_seats', value:seats});
+  // Pre-fill booking seats input
+  const bookSeats = document.getElementById('book-seats');
+  if (bookSeats) bookSeats.value = seats;
+  document.getElementById('mem-out').textContent =
+    `Booking prefs saved: ${theater || '—'}, ${seats} seat${seats>1?'s':''}`;
+});
+
+// Toggle buttons — camera mode + cloud vision
+document.querySelectorAll('.mem-toggle').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const pref = btn.dataset.pref;
+    const val  = btn.dataset.val;
+    await _memApi({action:'set_pref', key:pref, value:val});
+    _setToggleActive(pref, val);
+    // Apply immediately
+    if (pref === 'camera_mode') {
+      _visionFacing = val === 'front' ? 'user' : 'environment';
+    }
+    document.getElementById('mem-out').textContent =
+      `${pref.replace('_',' ')} set to ${val}`;
+  });
+});
+
+document.getElementById('mem-place-btn').addEventListener('click', async () => {
+  const label = document.getElementById('mem-place-label').value.trim();
+  const name  = document.getElementById('mem-place-name').value.trim();
+  if (!label || !name) return;
+  await _memApi({action:'save_place', label, name});
+  document.getElementById('mem-place-label').value = '';
+  document.getElementById('mem-place-name').value = '';
+  loadMemory();
+});
+
+document.getElementById('vid-btn').addEventListener('click',async()=>{
+  document.getElementById('vid-out').textContent='Identifying... speak now.';
+  setState('listening');
+  try{
+    const r=await fetch(`${API}/api/voice_id`,{method:'POST',body:JSON.stringify({duration:3}),headers:{'Content-Type':'application/json'}});
+    const d=await r.json();
+    document.getElementById('vid-out').textContent=d.name==='Guest'?'Not recognised (Guest).':'Identified: '+d.name+' ('+Math.round(d.confidence*100)+'% confidence)';
+  }catch{document.getElementById('vid-out').textContent='Server offline.';}
+  finally{setState('idle');}
+});
+
+// INIT
+(async()=>{
+  try{
+    const r=await fetch(`${API}/api/status`,{method:'POST',body:'{}',headers:{'Content-Type':'application/json'}});
+    const d=await r.json();
+    document.getElementById('ftxt').textContent=`JARVIS · AI:${d.ai_ready?'OK':'--'} TTS:${d.tts_ready?'OK':'--'} STT:${d.stt_ready?'OK':'--'}`;
+    if (typeof d.wake_active === 'boolean') setWakeWordUi(d.wake_active);
+    if (d.speaking) {
+      busy = true;
+      setState('speaking');
+    }
+  }catch{
+    document.getElementById('ftxt').textContent='JARVIS · server offline';
+  }
+})();
+
+// Duplicate SSE block removed.
+</script>
+</body>
+</html>

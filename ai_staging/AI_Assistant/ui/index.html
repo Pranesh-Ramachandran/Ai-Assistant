@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#08111f">
+  <title>JARVIS AI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+  <div class="bg-grid"></div>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">J</div>
+        <div>
+          <div class="brand-title">JARVIS AI</div>
+          <div class="brand-subtitle">Voice-first assistant dashboard</div>
+        </div>
+      </div>
+      <div class="status-row">
+        <span class="status-chip" id="apiStatus">API: checking...</span>
+        <span class="status-chip subtle" id="aiStatus">AI: unknown</span>
+        <span class="status-chip subtle" id="visionStatus">Vision: idle</span>
+      </div>
+      <button class="icon-button" id="hamburger" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </header>
+
+    <main class="main-grid">
+      <section class="hero-card">
+        <div class="hero-copy">
+          <p class="eyebrow">Jarvis Control Center</p>
+          <h1>One dashboard for chat, camera, booking, memory, and automation.</h1>
+          <p class="hero-text">
+            The simple UI now mirrors the real assistant flows: live camera preview, free snapshot capture,
+            booking, calendar, memory, calls, web automation, and system tools.
+          </p>
+          <div class="hero-actions">
+            <button class="primary-button" data-panel-target="chat">Open Chat</button>
+            <button class="ghost-button" data-panel-target="vision">Open Vision</button>
+            <button class="ghost-button" data-panel-target="booking">Book Movie</button>
+          </div>
+        </div>
+        <div class="hero-panel">
+          <div class="pulse-ring">
+            <div class="pulse-core"></div>
+          </div>
+          <div class="hero-metrics">
+            <div>
+              <span class="metric-label">Mode</span>
+              <strong>Local first</strong>
+            </div>
+            <div>
+              <span class="metric-label">Vision</span>
+              <strong>Free by default</strong>
+            </div>
+            <div>
+              <span class="metric-label">Cloud</span>
+              <strong>Explicit only</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <nav class="module-tabs" id="moduleTabs">
+        <button class="module-tab active" data-panel="chat">Chat</button>
+        <button class="module-tab" data-panel="vision">Vision</button>
+        <button class="module-tab" data-panel="booking">Booking</button>
+        <button class="module-tab" data-panel="calendar">Calendar</button>
+        <button class="module-tab" data-panel="memory">Memory</button>
+        <button class="module-tab" data-panel="tools">Tools</button>
+      </nav>
+
+      <div class="workspace">
+        <section class="panel active" id="panel-chat">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Conversation</p>
+              <h2>Talk to Jarvis</h2>
+            </div>
+            <button class="tiny-button" id="clearChatBtn">Clear</button>
+          </div>
+          <div class="chat-log" id="chatMessages">
+            <div class="message ai">
+              <div class="avatar">AI</div>
+              <div class="bubble">Hello. I am JARVIS. What can I do for you today?</div>
+            </div>
+          </div>
+          <div class="quick-chips" id="quickChips">
+            <button class="chip" data-text="What's my status?">Status</button>
+            <button class="chip" data-text="What can you do?">Capabilities</button>
+            <button class="chip" data-text="Read screen">Read Screen</button>
+            <button class="chip" data-text="Book tickets">Book Tickets</button>
+          </div>
+          <div class="composer">
+            <input id="messageInput" type="text" placeholder="Type a command or ask Jarvis..." autocomplete="off">
+            <button id="sendButton" class="primary-button">Send</button>
+          </div>
+        </section>
+
+        <section class="panel" id="panel-vision">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Vision</p>
+              <h2>Camera and screen analysis</h2>
+            </div>
+            <span class="panel-hint" id="visionHint">Live preview ready.</span>
+          </div>
+
+          <div class="vision-preview">
+            <video id="visPreview" autoplay playsinline muted></video>
+            <div class="vision-badge" id="visBadge">Camera off</div>
+          </div>
+          <canvas id="visCanvas" class="hidden"></canvas>
+
+          <div class="vision-actions">
+            <button class="primary-button" id="visStartBtn">Live Preview</button>
+            <button class="ghost-button" id="visCaptureBtn">Capture</button>
+            <button class="ghost-button" id="visAnalyzeBtn">Analyze</button>
+            <button class="ghost-button" id="visStopBtn">Stop</button>
+            <button class="ghost-button" id="visScreenBtn">Screen</button>
+            <button class="ghost-button" id="visQrBtn">Scan QR</button>
+            <button class="ghost-button" id="visOcrBtn">Read Text</button>
+          </div>
+          <div class="panel-output" id="visionOutput">Point the camera, capture a frame, or read the screen.</div>
+          <label class="toggle-row">
+            <input type="checkbox" id="visionCloudToggle">
+            <span>Use cloud analysis only when I press Analyze</span>
+          </label>
+        </section>
+
+        <section class="panel" id="panel-booking">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Booking</p>
+              <h2>Movie ticket flow</h2>
+            </div>
+            <span class="panel-hint">Free catalog + checkout handoff</span>
+          </div>
+
+          <div class="stack">
+            <label class="field">
+              <span>City</span>
+              <input id="bookCity" type="text" value="Chennai" placeholder="City">
+            </label>
+            <label class="field">
+              <span>Search movie</span>
+              <input id="bookQuery" type="text" placeholder="Try Leo, Jawan, Kalki...">
+            </label>
+          </div>
+
+          <div class="stack">
+            <label class="field">
+              <span>Movie</span>
+              <select id="bookMovie">
+                <option value="">Loading movies...</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Theater</span>
+              <select id="bookTheater">
+                <option value="">Select a movie first</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="showtime-row" id="bookShows"></div>
+
+          <div class="stack">
+            <label class="field compact">
+              <span>Seats</span>
+              <input id="bookSeats" type="number" min="1" max="10" value="1">
+            </label>
+            <button class="primary-button" id="bookCheckoutBtn">Open Checkout</button>
+            <button class="ghost-button" id="bookRefreshBtn">Refresh Catalog</button>
+          </div>
+          <div class="panel-output" id="bookingOutput">Tap a showtime to prepare the checkout summary.</div>
+        </section>
+
+        <section class="panel" id="panel-calendar">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Calendar</p>
+              <h2>Plan the day</h2>
+            </div>
+            <span class="panel-hint">Google Calendar via OAuth</span>
+          </div>
+          <div class="button-row">
+            <button class="ghost-button" data-calendar="today">Today</button>
+            <button class="ghost-button" data-calendar="week">This Week</button>
+            <button class="ghost-button" data-calendar="next">Next Event</button>
+            <button class="ghost-button" data-calendar="free">Free Slots</button>
+          </div>
+          <div class="stack">
+            <label class="field">
+              <span>Event title</span>
+              <input id="calSummary" type="text" placeholder="Team sync">
+            </label>
+            <label class="field">
+              <span>When</span>
+              <input id="calWhen" type="text" placeholder="Tomorrow 3pm">
+            </label>
+            <label class="field compact">
+              <span>Minutes</span>
+              <input id="calDuration" type="number" min="15" max="240" value="60">
+            </label>
+          </div>
+          <div class="button-row">
+            <button class="primary-button" id="calAddBtn">Add Event</button>
+          </div>
+          <div class="panel-output" id="calendarOutput">Calendar is waiting.</div>
+        </section>
+
+        <section class="panel" id="panel-memory">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Memory</p>
+              <h2>Profile and preferences</h2>
+            </div>
+            <span class="panel-hint">Saved locally in `.jarvis_memory.json`</span>
+          </div>
+          <div class="stack">
+            <label class="field">
+              <span>Name</span>
+              <input id="memName" type="text" placeholder="Your name">
+            </label>
+            <label class="field">
+              <span>City</span>
+              <input id="memCity" type="text" placeholder="Your city">
+            </label>
+          </div>
+          <div class="button-row">
+            <button class="primary-button" id="memSaveProfileBtn">Save Profile</button>
+          </div>
+          <div class="stack">
+            <label class="field">
+              <span>Place label</span>
+              <input id="memPlaceLabel" type="text" placeholder="home, office, gym">
+            </label>
+            <label class="field">
+              <span>Place name</span>
+              <input id="memPlaceName" type="text" placeholder="Marina Beach">
+            </label>
+          </div>
+          <div class="button-row">
+            <button class="primary-button" id="memSavePlaceBtn">Save Place</button>
+            <button class="ghost-button" id="memReloadBtn">Reload Memory</button>
+          </div>
+          <div class="panel-output" id="memoryOutput">No profile loaded yet.</div>
+        </section>
+
+        <section class="panel" id="panel-tools">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Tools</p>
+              <h2>Web, messages, home, system</h2>
+            </div>
+            <span class="panel-hint">One-tap utilities</span>
+          </div>
+
+          <div class="tool-grid">
+            <div class="tool-card">
+              <h3>Web automation</h3>
+              <input id="webCommand" type="text" placeholder="search iPhone 15 on amazon under 60000">
+              <div class="button-row">
+                <button class="primary-button" id="webRunBtn">Run</button>
+                <button class="ghost-button" id="webConfirmBtn">Confirm</button>
+                <button class="ghost-button" id="webCancelBtn">Cancel</button>
+              </div>
+              <div class="tool-note" id="webOutput">Search, fill, or type commands.</div>
+            </div>
+
+            <div class="tool-card">
+              <h3>Messages</h3>
+              <input id="msgContact" type="text" placeholder="Rahul">
+              <input id="msgText" type="text" placeholder="I am on my way">
+              <div class="button-row">
+                <button class="primary-button" id="msgDraftBtn">Draft</button>
+                <button class="ghost-button" id="msgConfirmBtn">Send</button>
+                <button class="ghost-button" id="msgCancelBtn">Cancel</button>
+              </div>
+              <div class="tool-note" id="msgOutput">Draft a reply, then confirm.</div>
+            </div>
+
+            <div class="tool-card">
+              <h3>Smart home</h3>
+              <input id="homeCommand" type="text" placeholder="turn on bedroom light">
+              <div class="button-row">
+                <button class="primary-button" id="homeRunBtn">Run</button>
+                <button class="ghost-button" data-scene="movie">Movie</button>
+                <button class="ghost-button" data-scene="sleep">Sleep</button>
+              </div>
+              <div class="tool-note" id="homeOutput">Lights, scenes, and devices.</div>
+            </div>
+
+            <div class="tool-card">
+              <h3>System</h3>
+              <div class="button-row">
+                <button class="ghost-button" data-system="all">All</button>
+                <button class="ghost-button" data-system="cpu">CPU</button>
+                <button class="ghost-button" data-system="ram">RAM</button>
+                <button class="ghost-button" data-system="wifi">WiFi</button>
+              </div>
+              <div class="tool-note" id="sysOutput">System status will appear here.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <aside class="drawer" id="sidebar" aria-hidden="true">
+    <div class="drawer-head">
+      <h3>Quick jump</h3>
+      <button class="icon-button small" id="drawerClose" aria-label="Close menu">✕</button>
+    </div>
+    <div class="drawer-list">
+      <button data-panel-target="chat">Chat</button>
+      <button data-panel-target="vision">Vision</button>
+      <button data-panel-target="booking">Booking</button>
+      <button data-panel-target="calendar">Calendar</button>
+      <button data-panel-target="memory">Memory</button>
+      <button data-panel-target="tools">Tools</button>
+    </div>
+  </aside>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <script src="script.js"></script>
+</body>
+</html>

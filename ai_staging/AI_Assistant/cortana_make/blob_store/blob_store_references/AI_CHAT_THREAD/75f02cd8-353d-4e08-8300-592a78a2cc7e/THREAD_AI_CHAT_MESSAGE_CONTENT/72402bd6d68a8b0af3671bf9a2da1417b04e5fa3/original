@@ -1,0 +1,1 @@
+{"filePath":"/src/app/App.tsx","snippetStartLine":26,"tagLine":27,"snippet":"<p className=\"text-xs sm:text-sm text-gray-600 mb-1\">\n          Connected{cursorVisible && <span className=\"text-blue-500\">|</span>}\n        </p>","tagName":"p"}

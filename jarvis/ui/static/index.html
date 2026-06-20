@@ -103,6 +103,8 @@
     <div id="log"></div>
     <div class="row">
       <input id="inp" type="text" placeholder="Ask Jarvis something…" autocomplete="off" />
+      <button class="ib" id="vb" title="Vision">👁️</button>
+      <button class="ib" id="db" title="Document">📄</button>
       <button class="ib" id="mb" title="Mic">🎙</button>
       <button class="ib" id="sb" title="Send">↑</button>
     </div>
@@ -115,7 +117,7 @@
         <div class="ab" style="height:5px"></div><div class="ab" style="height:3px"></div>
         <div class="ab" style="height:8px"></div><div class="ab" style="height:4px"></div>
       </div>
-      <div id="ftxt">JARVIS · v3.0</div>
+
     </div>
   </div>
 </div>
@@ -364,6 +366,104 @@ document.getElementById('mb').addEventListener('click', () => {
 // Called by Python when voice capture ends (success or fail)
 function onVoiceDone() {
   document.getElementById('mb').classList.remove('rec');
+}
+
+// ── Vision commands ────────────────────────────────────────────────────────────────
+document.getElementById('vb').addEventListener('click', () => {
+  const options = [
+    'What do you see?',
+    'Read screen text',
+    'Scan QR code',
+    'Vision capabilities'
+  ];
+  
+  const choice = prompt('Choose a vision command:\n' + 
+    options.map((opt, i) => `${i+1}. ${opt}`).join('\n'));
+    
+  const index = parseInt(choice) - 1;
+  if (index >= 0 && index < options.length) {
+    const commands = [
+      'what do you see',
+      'read screen text', 
+      'scan qr code',
+      'what are your vision capabilities'
+    ];
+    
+    const command = commands[index];
+    busy = true;
+    setState('thinking');
+    addMsg('user', command);
+    
+    fetch('/send_message', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: command})
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        addMsg('jarvis', data.response);
+      } else {
+        addMsg('jarvis', data.message || 'Vision command failed', 'error');
+      }
+      setState('idle');
+      busy = false;
+    })
+    .catch(error => {
+      addMsg('jarvis', 'Error executing vision command', 'error');
+      setState('error');
+      busy = false;
+    });
+  }
+});
+document.getElementById('db').addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.txt,.jpg,.jpeg,.png,.bmp,.tiff,.md,.rtf';
+  input.addEventListener('change', handleDocumentUpload);
+  input.click();
+});
+
+function handleDocumentUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  if (file.size > 10 * 1024 * 1024) {
+    addMsg('jarvis', 'File too large (max 10MB)', 'error');
+    return;
+  }
+  
+  const formData = new FormData();
+  formData.append('document', file);
+  
+  const query = prompt('Ask a question about this document (optional):');
+  if (query && query.trim()) {
+    formData.append('query', query.trim());
+  }
+  
+  busy = true;
+  setState('thinking');
+  addMsg('user', `📄 ${file.name}${query ? ' - ' + query : ''}`);
+  
+  fetch('/document_upload', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      addMsg('jarvis', data.result);
+    } else {
+      addMsg('jarvis', data.message || 'Document processing failed', 'error');
+    }
+    setState('idle');
+    busy = false;
+  })
+  .catch(error => {
+    addMsg('jarvis', 'Error uploading document', 'error');
+    setState('error');
+    busy = false;
+  });
 }
 
 updateUI('idle');

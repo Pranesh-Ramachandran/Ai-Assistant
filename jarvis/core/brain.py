@@ -14,7 +14,28 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from jarvis.core.nlp import process_natural_language
-from jarvis.services.data_collector import get_information, get_weather
+from jarvis.services.data_collector import get_information, get_weather, get_news_headlines
+
+logger = logging.getLogger(__name__)
+
+# ── Optional document intelligence ──────────────────────────────────────────
+try:
+    from jarvis.services.document_intelligence import process_document_command
+    _DOC_INTEL_AVAILABLE = True
+except ImportError as e:
+    _DOC_INTEL_AVAILABLE = False
+    logger.warning("Document intelligence not loaded: %s", e)
+    def process_document_command(text): return "Document intelligence not available."
+
+# ── Optional vision ─────────────────────────────────────────────────────────
+try:
+    from jarvis.services.vision import handle_vision_command, get_vision_capabilities
+    _VISION_AVAILABLE = True
+except ImportError as e:
+    _VISION_AVAILABLE = False
+    logger.warning("Vision not loaded: %s", e)
+    def handle_vision_command(text): return "Vision not available."
+    def get_vision_capabilities(): return "Vision features require additional packages."
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +110,7 @@ class JarvisBrain:
         if not command:
             return ""
         normalized = command.lower().strip()
-        normalized = re.sub(r"[^\w\s:]", " ", normalized)
+        normalized = re.sub(r"[^\w\s:\+\-\*/\(\)%\=\.]", " ", normalized)
         return re.sub(r"\s+", " ", normalized).strip()
 
     # ── Intent mapping ────────────────────────────────────────────────────────
@@ -103,12 +124,12 @@ class JarvisBrain:
         "music": "music",
         "alarm_reminder": "alarm_reminder",
         "booking": "booking",
-        "capability_query": "info_request",
+        "capability_query": "capabilities",
         "farewell": "exit",
         "info_request": "info_request",
         "calculation": "info_request",
         "definition": "info_request",
-        "news_query": "info_request",
+        "news_query": "news",
         "joke": "joke",
     }
 
@@ -163,6 +184,13 @@ class JarvisBrain:
             return "weather"
         if has_any(["music", "song", "play", "audio", "track", "volume", "playlist"]):
             return "music"
+        # Check more specific alarm sub-intents before the generic one
+        if "cancel" in cleaned and ("alarm" in cleaned or "reminder" in cleaned):
+            return "cancel_alarm"
+        if any(w in cleaned for w in ("list", "show")) and ("alarm" in cleaned or "reminder" in cleaned):
+            return "list_alarms"
+        if has_any(["scan qr", "qr code", "what do you see", "read screen", "vision", "camera", "look", "describe image"]):
+            return "vision"
         if has_any(["alarm", "remind", "reminder", "wake", "schedule"]):
             return "alarm_reminder"
         if has_any(["book", "ticket", "reserve", "reservation", "hotel", "flight", "train"]):
@@ -173,6 +201,16 @@ class JarvisBrain:
             return "greeting"
         if has_any(["thank", "thanks", "nandri"]):
             return "thanks"
+        if has_any(["what can you do", "your features", "capabilities"]):
+            return "capabilities"
+        if has_any(["forget everything", "clear memory", "clear history", "reset conversation"]):
+            return "clear_memory"
+        if has_any(["news", "headline", "latest update"]):
+            return "news"
+        if has_any(["document", "pdf", "analyze", "summarize", "extract", "image text"]):
+            return "document_intelligence"
+        if has_any(["vision", "camera", "see", "look", "what do you see", "read screen", "qr code", "describe image", "scan qr", "ocr"]):
+            return "vision"
         if has_any(["who", "what", "why", "how", "tell me", "explain", "info", "information",
                     "define", "meaning of", "what does"]):
             return "info_request"
@@ -214,6 +252,19 @@ class JarvisBrain:
                 else nlp_response or "I can handle device commands once the IoT module is connected."
             ),
             "alarm_reminder": lambda: self.handle_alarm_reminder(command),
+            "list_alarms": lambda: self._list_alarms(),
+            "cancel_alarm": lambda: self._cancel_alarms(),
+            "capabilities": lambda: self._capabilities_response(),
+            "clear_memory": lambda: self._clear_memory_response(),
+            "news": lambda: get_news_headlines(),
+            "document_intelligence": lambda: (
+                process_document_command(command) if _DOC_INTEL_AVAILABLE
+                else "Document intelligence requires additional packages. Install with: pip install PyPDF2 pytesseract pillow"
+            ),
+            "vision": lambda: (
+                handle_vision_command(command) if _VISION_AVAILABLE
+                else "Vision requires additional packages. Install with: pip install opencv-python pillow pytesseract pyzbar"
+            ),
             "booking": lambda: nlp_response or "Tell me what you want to book and I will guide you through it.",
             "info_request": lambda: (
                 (ai_ask(command or "") if _AI_BRAIN_AVAILABLE else None)
@@ -276,13 +327,84 @@ class JarvisBrain:
         now = datetime.now()
         return f"It is {now.strftime('%I:%M %p').lstrip('0')} on {now.strftime('%A, %B %d, %Y')}."
 
+    def _capabilities_response(self) -> str:
+        return (
+            "Here is what I can do:\n"
+            "\u2022 \U0001f551 Time & Date \u2014 'what time is it', 'what day is it'\n"
+            "\u2022 \U0001f326\ufe0f Weather \u2014 'weather in London', 'temperature in Chennai'\n"
+            "\u2022 \u23f0 Reminders \u2014 'remind me in 5 minutes', 'alarm at 7:30 am'\n"
+            "\u2022 \U0001f4a1 IoT Control \u2014 'turn on the light', 'dim the lamp'\n"
+            "\u2022 \U0001f4ac AI Questions \u2014 'explain quantum computing', 'who is Elon Musk'\n"
+            "\u2022 \U0001f3b5 Music \u2014 'play some jazz', 'pause music'\n"
+            "\u2022 \U0001f602 Jokes \u2014 'tell me a joke'\n"
+            "\u2022 \U0001f4dd Alarms \u2014 'list my alarms', 'cancel all alarms'\n"
+            "\u2022 \U0001f4c4 Documents \u2014 'analyze document file.pdf', 'extract text from image.jpg'\n"
+            "\u2022 \U0001f441\ufe0f Vision \u2014 'what do you see', 'read screen', 'scan QR code'\n"
+            "\u2022 \U0001f9f9 Memory \u2014 'clear conversation history'"
+        )
+
+    def _clear_memory_response(self) -> str:
+        try:
+            ai_clear()
+        except Exception:
+            pass
+        self.context["conversation"] = []
+        self.context["last_response"] = None
+        self.context["last_command"] = None
+        return "Done. I have cleared our conversation history and started fresh."
+
+    def _list_alarms(self) -> str:
+        alarms = [a for a in self.memory.get("alarms", []) if a.get("active")]
+        if not alarms:
+            return "You have no active reminders."
+        lines = []
+        for a in alarms:
+            try:
+                dt = datetime.fromisoformat(a["datetime"])
+                lines.append(f"  \u2022 {dt.strftime('%I:%M %p').lstrip('0')}: {a.get('message', 'Reminder')}")
+            except (ValueError, KeyError):
+                pass
+        return "Active reminders:\n" + "\n".join(lines) if lines else "No active reminders."
+
+    def _cancel_alarms(self) -> str:
+        alarms = self.memory.get("alarms", [])
+        active = [a for a in alarms if a.get("active")]
+        if not active:
+            return "No active alarms to cancel."
+        for a in active:
+            a["active"] = False
+        self._memory_dirty = True
+        self._save_memory()
+        return f"Cancelled {len(active)} reminder(s)."
+
     # ── Alarm / reminder ──────────────────────────────────────────────────────
 
     def handle_alarm_reminder(self, command: str) -> str:
         cleaned = self._normalize_command(command or "")
         words = cleaned.split()
-        time_found = None
 
+        # ── Relative time: "in N minutes" / "in N hours" ──────────────────────
+        rel_m = re.search(r"in\s+(\d+)\s+minute", cleaned)
+        rel_h = re.search(r"in\s+(\d+)\s+hour", cleaned)
+        rel_s = re.search(r"in\s+(\d+)\s+second", cleaned)
+        if rel_m or rel_h or rel_s:
+            delta_seconds = 0
+            if rel_m:
+                delta_seconds += int(rel_m.group(1)) * 60
+            if rel_h:
+                delta_seconds += int(rel_h.group(1)) * 3600
+            if rel_s:
+                delta_seconds += int(rel_s.group(1))
+            alarm_time = datetime.now() + timedelta(seconds=delta_seconds)
+            # Extract message: everything after "remind me (to)?"
+            msg_match = re.search(r"remind(?:\s+me)?(?:\s+to)?\s+(.+?)(?:\s+in\s+\d+|$)", cleaned)
+            message = msg_match.group(1).strip() if msg_match else "Reminder"
+            if not message or message in ("me", "to", ""):
+                message = "Reminder"
+            return self.set_alarm_reminder_abs(alarm_time, message)
+
+        # ── Absolute time: "at 7:30", "for 7:30 pm" ──────────────────────────
+        time_found = None
         for i, word in enumerate(words):
             if ":" in word and len(word) <= 8:
                 time_found = word
@@ -294,7 +416,7 @@ class JarvisBrain:
                     break
 
         if not time_found:
-            return "Tell me the reminder time in HH:MM format so I can save it."
+            return "Tell me when \u2014 for example: 'remind me in 5 minutes' or 'alarm at 7:30 pm'."
 
         message = "Reminder"
         if time_found in words:
@@ -321,18 +443,22 @@ class JarvisBrain:
             if alarm_time < datetime.now():
                 alarm_time += timedelta(days=1)
 
-            self.memory.setdefault("alarms", []).append({
-                "time": time_str,
-                "message": message,
-                "datetime": alarm_time.isoformat(),
-                "active": True,
-            })
-            self._memory_dirty = True
-            self._save_memory()
-            return f"Reminder set for {alarm_time.strftime('%I:%M %p').lstrip('0')}: {message}"
+            return self.set_alarm_reminder_abs(alarm_time, message)
         except (ValueError, AttributeError) as e:
             logger.warning("Failed to set alarm: %s", e)
             return "I could not set that reminder. Use a time like 07:30 or 7:30 pm."
+
+    def set_alarm_reminder_abs(self, alarm_time: datetime, message: str = "Alarm") -> str:
+        """Save an alarm given an absolute datetime object."""
+        self.memory.setdefault("alarms", []).append({
+            "time": alarm_time.strftime("%I:%M %p"),
+            "message": message,
+            "datetime": alarm_time.isoformat(),
+            "active": True,
+        })
+        self._memory_dirty = True
+        self._save_memory()
+        return f"Reminder set for {alarm_time.strftime('%I:%M %p').lstrip('0')}: {message}"
 
     # ── Memory persistence ────────────────────────────────────────────────────
 

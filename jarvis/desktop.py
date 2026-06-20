@@ -77,29 +77,29 @@ class JarvisAPI:
     # ── Internal processing ───────────────────────────────────────────────────
 
     def _process(self, text: str):
-        with self._lock:
-            self._set_state("thinking")
-            try:
+        self._set_state("thinking")
+        try:
+            with self._lock:
                 intent = self._brain.analyze_intent(text)
                 response = self._brain.generate_response(intent, text)
-            except Exception:
-                logger.exception("Brain error")
-                response = "Something went wrong."
-                self._set_state("error")
-                self._add_msg("jarvis", response)
-                threading.Timer(2.0, lambda: (self._set_state("idle"), self._js("onBrainDone()"))).start()
-                return
-
-            self._set_state("speaking")
+        except Exception:
+            logger.exception("Brain error")
+            response = "Something went wrong."
+            self._set_state("error")
             self._add_msg("jarvis", response)
+            threading.Timer(2.0, lambda: (self._set_state("idle"), self._js("onBrainDone()"))).start()
+            return
 
-            try:
-                self._tts.speak(response)
-            except Exception as e:
-                logger.warning("TTS error: %s", e)
+        self._set_state("speaking")
+        self._add_msg("jarvis", response)
 
-            self._set_state("idle")
-            self._js("onBrainDone()")
+        try:
+            self._tts.speak(response)
+        except Exception as e:
+            logger.warning("TTS error: %s", e)
+
+        self._set_state("idle")
+        self._js("onBrainDone()")
 
     def _voice_loop_once(self):
         """Capture one voice command, process it."""
@@ -136,12 +136,15 @@ class JarvisAPI:
 
 
 def run():
+    import atexit
     from jarvis.core.brain import JarvisBrain
     from jarvis.services.tts import EnhancedTTS
 
     api = JarvisAPI()
     api._brain = JarvisBrain()
     api._tts = EnhancedTTS()
+
+    atexit.register(api._brain.stop_alarm_thread)  # Fix #16: clean shutdown
 
     window = webview.create_window(
         title="JARVIS",

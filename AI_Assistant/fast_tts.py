@@ -1,14 +1,15 @@
 """
-JARVIS Fast TTS — Edge-TTS (female Aria voice) as DEFAULT.
-Falls back to pyttsx3 (Windows SAPI) only when offline.
+JARVIS Fast TTS — Azure Speech (female neural voice) as DEFAULT when configured.
+Falls back to edge-tts Aria, then pyttsx3 (Windows SAPI) only when offline.
 
 Architecture:
-  - Primary:  edge-tts streaming (en-US-AriaNeural) — natural female voice
+  - Primary:  Azure Speech (en-US-AriaNeural by default) — natural female voice
+  - Fallback: edge-tts streaming (en-US-AriaNeural) — natural female voice
   - Fallback: pyttsx3 (Windows SAPI) — offline, instant but robotic
   - Emergency: print + beep
 
 Public API:
-  speak(text)              → edge-tts Aria (default)
+  speak(text)              → Azure Speech Aria (default when configured)
   speak_fast(text)         → pyttsx3 instant (offline fallback)
   stop_speaking()          → stop all audio
 """
@@ -92,6 +93,14 @@ try:
 except ImportError:
     _edge_tts = None
     _EDGE_TTS_AVAILABLE = False
+
+# ─── Azure Speech SDK (primary when configured) ─────────────────────────────
+try:
+    import azure.cognitiveservices.speech as _speechsdk
+    _AZURE_AVAILABLE = True
+except ImportError:
+    _speechsdk = None
+    _AZURE_AVAILABLE = False
 
 # ─── pygame (for audio playback) ─────────────────────────────────────────────
 try:
@@ -208,6 +217,16 @@ _PYGAME_READY = False
 _PYGAME_LOCK = threading.Lock()
 
 
+def _azure_enabled() -> bool:
+    return _AZURE_AVAILABLE and bool(os.getenv("AZURE_SPEECH_KEY")) and bool(os.getenv("AZURE_SPEECH_REGION"))
+
+
+def _azure_voice(lang: str, text: str) -> str:
+    if lang in ("ta", "mixed") or _contains_tamil(text):
+        return os.getenv("AZURE_TTS_TAMIL_VOICE", "ta-IN-PallaviNeural")
+    return os.getenv("AZURE_TTS_VOICE", "en-US-AriaNeural")
+
+
 def _ensure_pygame() -> bool:
     global _PYGAME_READY
     if not _PYGAME_AVAILABLE:
@@ -235,6 +254,25 @@ def _select_voice(text: str, lang: str) -> str:
     if lang in ("ta", "mixed") or _contains_tamil(text):
         return "ta-IN-PallaviNeural"
     return "en-US-AriaNeural"      # Female, natural tone
+
+
+def _azure_speak(text: str, lang: str = "en") -> bool:
+    if not _azure_enabled():
+        return False
+    try:
+        key = os.getenv("AZURE_SPEECH_KEY", "")
+        region = os.getenv("AZURE_SPEECH_REGION", "eastus")
+        cfg = _speechsdk.SpeechConfig(subscription=key, region=region)
+        cfg.speech_synthesis_voice_name = _azure_voice(lang, text)
+        audio_cfg = _speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
+        synthesizer = _speechsdk.SpeechSynthesizer(speech_config=cfg, audio_config=audio_cfg)
+        _notify_playback_start()
+        result = synthesizer.speak_text_async(text).get()
+        _notify_playback_end()
+        return result.reason == _speechsdk.ResultReason.SynthesizingAudioCompleted
+    except Exception as exc:
+        LOGGER.warning("Azure TTS speak failed: %s", exc)
+        return False
 
 
 async def _stream_to_bytes(text: str, voice: str) -> bytes:
@@ -404,7 +442,11 @@ def speak(text: str, lang: str = "en", interrupt: bool = False) -> None:
         stop_speaking()
 
     def _worker():
-        # PRIMARY: edge-tts (natural female voice)
+        # PRIMARY: Azure Speech (natural female voice)
+        if _azure_speak(cleaned, lang):
+            return
+
+        # SECONDARY: edge-tts (natural female voice)
         if _edge_tts_speak(cleaned, lang):
             return
 
@@ -432,8 +474,11 @@ def speak_fast(text: str, lang: str = "en", interrupt: bool = False) -> None:
         return
 
     if lang in ("ta", "mixed") or _contains_tamil(cleaned):
-        # Tamil needs edge-tts, no SAPI voice available
+        # Tamil needs Azure/edge-tts, no SAPI voice available
         speak(cleaned, lang, interrupt)
+        return
+
+    if _azure_speak(cleaned, lang):
         return
 
     worker = _get_sapi_worker()
@@ -483,13 +528,15 @@ def _beep() -> None:
 def get_tts_status() -> dict:
     worker = _get_sapi_worker()
     return {
+        "azure_available": _azure_enabled(),
+        "azure_voice": _azure_voice("en", "sample"),
         "pyttsx3_available": _PYTTSX3_AVAILABLE,
         "pyttsx3_engine_ready": worker is not None and worker._engine is not None,
         "edge_tts_available": _EDGE_TTS_AVAILABLE,
         "pygame_available": _PYGAME_AVAILABLE,
-        "default_voice": "en-US-AriaNeural (edge-tts, female)",
+        "default_voice": "en-US-AriaNeural (Azure Speech, female)" if _azure_enabled() else "en-US-AriaNeural (edge-tts, female)",
         "fallback_voice": "Windows SAPI (pyttsx3)",
-        "mode": "edge-tts primary",
+        "mode": "azure speech primary" if _azure_enabled() else "edge-tts primary",
     }
 
 

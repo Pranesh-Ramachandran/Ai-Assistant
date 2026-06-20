@@ -198,7 +198,7 @@ except Exception as e:
     _ERROR_RECOVERY_OK = False
     print(f"[JARVIS] Error recovery unavailable: {e}")
 
-# ── Tier 2: Advanced conversational features ─────────────────────────────────
+
 try:
     from natural_followup import handle_followup
     _FOLLOWUP_OK = True
@@ -950,6 +950,13 @@ class _ConversationMemory:
 
 _MEMORY = _ConversationMemory()
 
+# Wire extended memory for cross-session context
+try:
+    from extended_memory import EXTENDED_MEMORY as _EXT_MEM
+    _EXT_MEM_OK = True
+except Exception:
+    _EXT_MEM_OK = False
+
 # Bug 3 fix: initialize _pending_schedule at module level to prevent NameError
 _pending_schedule: dict = {}
 
@@ -1039,6 +1046,14 @@ _groq_client = None
 
 def _get_groq():
     global _groq_client
+    # During unit tests or CI we avoid creating a real Groq client to
+    # prevent network calls and incompatibilities with the installed
+    # groq/httpx versions. Detect pytest by environment or loaded modules
+    # and skip client creation in that case.
+    running_under_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST") or any('pytest' in k for k in sys.modules.keys()))
+    if running_under_pytest:
+        return None
+
     if _groq_client is None and _GROQ_LIB and GROQ_KEY:
         _groq_client = _Groq(api_key=GROQ_KEY)
     return _groq_client

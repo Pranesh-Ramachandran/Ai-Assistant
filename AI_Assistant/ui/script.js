@@ -64,6 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
     homeCommand: document.getElementById('homeCommand'),
     homeRunBtn: document.getElementById('homeRunBtn'),
     homeOutput: document.getElementById('homeOutput'),
+    emojiToggleBtn: document.getElementById('emojiToggleBtn'),
+    emojiBar: document.getElementById('emojiBar'),
     sysOutput: document.getElementById('sysOutput'),
   };
 
@@ -135,17 +137,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const avatar = document.createElement('div');
     avatar.className = 'avatar';
-    avatar.textContent = role === 'user' ? 'U' : 'AI';
+    avatar.textContent = role === 'user' ? '🧑' : '🤖';
 
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
 
-    row.appendChild(avatar);
-    row.appendChild(bubble);
+    // Emoji reactions row (appears on hover)
+    const reactions = document.createElement('div');
+    reactions.className = 'bubble-reactions';
+    ['👍','❤️','😂','🔥','✨'].forEach(emoji => {
+      const btn = document.createElement('button');
+      btn.className = 'reaction-btn';
+      btn.textContent = emoji;
+      btn.title = emoji;
+      btn.addEventListener('click', () => {
+        btn.classList.toggle('reacted');
+        // fun jiggle on the bubble
+        bubble.style.animation = 'none';
+        requestAnimationFrame(() => {
+          bubble.style.animation = '';
+          bubble.style.animation = 'bubbleWobbleIn 0.45s cubic-bezier(0.34,1.8,0.64,1)';
+        });
+        setTimeout(() => { bubble.style.animation = ''; }, 480);
+      });
+      reactions.appendChild(btn);
+    });
+
+    const msgContent = document.createElement('div');
+    msgContent.style.display = 'flex';
+    msgContent.style.flexDirection = 'column';
+    msgContent.style.alignItems = role === 'user' ? 'flex-end' : 'flex-start';
+    msgContent.appendChild(bubble);
+    msgContent.appendChild(reactions);
+
+    if (role === 'user') {
+      row.appendChild(msgContent);
+      row.appendChild(avatar);
+    } else {
+      row.appendChild(avatar);
+      row.appendChild(msgContent);
+    }
     els.chatMessages.appendChild(row);
 
-    let i = 0;
-    const speed = role === 'user' ? 0 : 12;
+    const speed = role === 'user' ? 0 : 11;
 
     if (speed === 0) {
       bubble.textContent = text;
@@ -153,9 +187,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    let i = 0;
     const type = () => {
       bubble.textContent += text.charAt(i);
-      i += 1;
+      i++;
       if (i < text.length) {
         setTimeout(type, speed);
       } else {
@@ -163,6 +198,35 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
     type();
+  }
+
+  function showTypingIndicator() {
+    const row = document.createElement('div');
+    row.className = 'message ai typing-indicator';
+    row.id = '__typing__';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = '🤖';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    [1,2,3].forEach(() => {
+      const dot = document.createElement('span');
+      dot.className = 'typing-dot';
+      bubble.appendChild(dot);
+    });
+
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+    els.chatMessages.appendChild(row);
+    els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
+    return row;
+  }
+
+  function removeTypingIndicator() {
+    const el = document.getElementById('__typing__');
+    if (el) el.remove();
   }
 
   async function api(path, body = {}) {
@@ -195,9 +259,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!text) return;
     appendMessage('user', text);
     els.messageInput.value = '';
+    // Show typing indicator while waiting
+    const typingRow = showTypingIndicator();
     api('/api/chat', { message: text })
-      .then(data => appendMessage('ai', data.reply || data.error || 'No response.'))
-      .catch(() => appendMessage('ai', 'Server offline.'))
+      .then(data => {
+        removeTypingIndicator();
+        appendMessage('ai', data.reply || data.error || 'No response.');
+      })
+      .catch(() => {
+        removeTypingIndicator();
+        appendMessage('ai', 'Server offline. 😴');
+      });
   }
 
   let visionTimer = null;
@@ -577,8 +649,32 @@ document.addEventListener('DOMContentLoaded', () => {
   els.clearChatBtn.addEventListener('click', async () => {
     await api('/api/clear', {}).catch(() => {});
     els.chatMessages.innerHTML = '';
-    appendMessage('ai', 'Memory cleared. Ready for the next command.');
+    appendMessage('ai', 'Memory cleared. Ready for the next command. 🧹');
   });
+
+  // Emoji bar toggle
+  if (els.emojiToggleBtn && els.emojiBar) {
+    els.emojiToggleBtn.addEventListener('click', () => {
+      const isOpen = els.emojiBar.classList.toggle('open');
+      els.emojiToggleBtn.classList.toggle('active', isOpen);
+      // fun spin animation on toggle
+      els.emojiToggleBtn.style.animation = 'none';
+      requestAnimationFrame(() => {
+        els.emojiToggleBtn.style.animation = '';
+      });
+    });
+
+    els.emojiBar.addEventListener('click', e => {
+      const btn = e.target.closest('[data-emoji]');
+      if (!btn) return;
+      const emoji = btn.dataset.emoji;
+      els.messageInput.value += emoji;
+      els.messageInput.focus();
+      // fun wobble on the button
+      btn.style.transform = 'scale(1.6) rotate(15deg)';
+      setTimeout(() => { btn.style.transform = ''; }, 200);
+    });
+  }
 
   els.hamburger.addEventListener('click', openDrawer);
   els.drawerClose.addEventListener('click', closeDrawer);

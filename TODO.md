@@ -1,24 +1,10 @@
-# JARVIS AI Assistant - Task Tracking
+# TODO - Push project to GitHub
 
-## Completed Fixes ✅
-- [x] Fix wake word detector for "aria" - Added fuzzy matching + US English recognition
-- [x] Fix raw JSON news tool leak - Enhanced _clean_response patterns  
-- [x] Fix weather unicode corruption - Replaced symbols with readable text
-- [x] Fix weather empty response - Added Groq JSON tool call fallback handler
-- [x] Improve wake word auto-listen logging - Better error handling & debugging
-- [x] Support general queries (not just specific tasks) - LLM handles any query type
-
-## Current Status
-System now properly handles:
-- ✅ Wake word detection ("hey jarvis", "hey aria")
-- ✅ Weather queries (with clean output)  
-- ✅ General conversations (not restricted to specific tasks)
-- ✅ Response cleaning (removes leaked tool calls)
-- ⚠️ Tool execution fallback (Groq JSON fallback handler needs verification)
-
-## Remaining Work
-- [ ] Verify Groq JSON fallback handler is triggered for all tool call patterns
-- [ ] Add cache clearing command to prevent stale bad responses
-- [ ] Test full wake word → STT → AI response → restart flow
-- [ ] Optimize response time for general queries
+- [ ] Check whether a local .git exists; if not, initialize a new git repo.
+- [ ] Create/ensure a default branch (main).
+- [ ] Add a remote `origin` pointing to https://github.com/Pranesh-Ramachandran/Ai-Assistant.git
+- [ ] Stage files while respecting .gitignore; verify `git status` is clean except intended changes.
+- [ ] Commit all changes with an initial commit message.
+- [ ] Push to GitHub (`git push -u origin main`).
+- [ ] If push is rejected (auth/permission), report the exact error and propose fork/branch push.
 

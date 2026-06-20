@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS — Login</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    background: #0a0a0f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #e0e0e0;
+    overflow: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: gridMove 20s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes gridMove { from { transform: translateY(0); } to { transform: translateY(40px); } }
+
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.15;
+    pointer-events: none;
+  }
+  .orb-1 { width: 400px; height: 400px; background: #00d4ff; top: -100px; left: -100px; animation: float1 8s ease-in-out infinite; }
+  .orb-2 { width: 300px; height: 300px; background: #7b2fff; bottom: -80px; right: -80px; animation: float2 10s ease-in-out infinite; }
+  @keyframes float1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(30px,20px)} }
+  @keyframes float2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-20px,-30px)} }
+
+  .card {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 20px;
+    padding: 40px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 0 60px rgba(0,212,255,0.05), 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .logo {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .logo-ring {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    border: 2px solid rgba(0,212,255,0.4);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    position: relative;
+    animation: pulse 3s ease-in-out infinite;
+  }
+  .logo-ring::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,212,255,0.15);
+    animation: pulse 3s ease-in-out infinite 0.5s;
+  }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,0.3)} 50%{box-shadow:0 0 0 12px rgba(0,212,255,0)} }
+  .logo-ring svg { width: 32px; height: 32px; fill: #00d4ff; }
+  .logo h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: 4px; color: #fff; }
+  .logo p { font-size: 0.75rem; color: rgba(0,212,255,0.6); letter-spacing: 2px; margin-top: 4px; }
+
+  .tabs {
+    display: flex;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 28px;
+    gap: 4px;
+  }
+  .tab {
+    flex: 1; padding: 10px;
+    border: none; border-radius: 8px;
+    background: transparent; color: rgba(255,255,255,0.4);
+    font-size: 0.85rem; font-weight: 600; letter-spacing: 1px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .tab.active { background: rgba(0,212,255,0.15); color: #00d4ff; }
+
+  .form { display: none; flex-direction: column; gap: 14px; }
+  .form.active { display: flex; }
+
+  .field {
+    position: relative;
+  }
+  .field input {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .field input:focus {
+    border-color: rgba(0,212,255,0.5);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.08);
+  }
+  .field input::placeholder { color: rgba(255,255,255,0.25); }
+
+  .btn {
+    padding: 14px;
+    border: none; border-radius: 10px;
+    font-size: 0.9rem; font-weight: 700; letter-spacing: 1px;
+    cursor: pointer; transition: all 0.2s;
+    margin-top: 4px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #00d4ff, #0099cc);
+    color: #000;
+    box-shadow: 0 4px 20px rgba(0,212,255,0.3);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,212,255,0.4); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-voice {
+    background: rgba(123,47,255,0.15);
+    border: 1px solid rgba(123,47,255,0.4);
+    color: #a78bfa;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-voice:hover { background: rgba(123,47,255,0.25); }
+  .btn-voice.listening { animation: voicePulse 1s ease-in-out infinite; border-color: #7b2fff; }
+  @keyframes voicePulse { 0%,100%{box-shadow:0 0 0 0 rgba(123,47,255,0.4)} 50%{box-shadow:0 0 0 8px rgba(123,47,255,0)} }
+
+  .divider {
+    display: flex; align-items: center; gap: 12px;
+    color: rgba(255,255,255,0.2); font-size: 0.75rem;
+  }
+  .divider::before, .divider::after {
+    content: ''; flex: 1;
+    height: 1px; background: rgba(255,255,255,0.08);
+  }
+
+  .msg {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    text-align: center;
+    display: none;
+  }
+  .msg.error { background: rgba(255,60,60,0.1); border: 1px solid rgba(255,60,60,0.3); color: #ff6b6b; display: block; }
+  .msg.success { background: rgba(0,212,100,0.1); border: 1px solid rgba(0,212,100,0.3); color: #4ade80; display: block; }
+  .msg.info { background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2); color: #00d4ff; display: block; }
+</style>
+</head>
+<body>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-ring">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+    </div>
+    <h1>JARVIS</h1>
+    <p>AI ASSISTANT</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="tabLogin" onclick="switchTab('login')">LOGIN</button>
+    <button class="tab" id="tabRegister" onclick="switchTab('register')">REGISTER</button>
+  </div>
+
+  <div id="msg" class="msg"></div>
+
+  <!-- Login form -->
+  <form class="form active" id="formLogin" onsubmit="submitLogin(event)">
+    <div class="field"><input type="email" id="loginEmail" placeholder="Email" required autocomplete="email"></div>
+    <div class="field"><input type="password" id="loginPassword" placeholder="Password" required autocomplete="current-password"></div>
+    <button type="submit" class="btn btn-primary">LOGIN</button>
+    <div class="divider">or</div>
+    <button type="button" class="btn btn-voice" id="voiceBtn" onclick="voiceLogin()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1 1.93c-3.94-.49-7-3.85-7-7.93H2c0 4.97 3.53 9.11 8 9.9V22h4v-4.07c4.47-.79 8-4.93 8-9.9h-2c0 4.08-3.06 7.44-7 7.93V15h-2v.93z"/></svg>
+      VOICE LOGIN
+    </button>
+  </form>
+
+  <!-- Register form -->
+  <form class="form" id="formRegister" onsubmit="submitRegister(event)">
+    <div class="field"><input type="text" id="regName" placeholder="Full Name" required autocomplete="name"></div>
+    <div class="field"><input type="email" id="regEmail" placeholder="Email" required autocomplete="email"></div>
+    <div class="field"><input type="password" id="regPassword" placeholder="Password (min 8 chars)" required autocomplete="new-password"></div>
+    <div class="field"><input type="password" id="regConfirm" placeholder="Confirm Password" required autocomplete="new-password"></div>
+    <button type="submit" class="btn btn-primary">CREATE ACCOUNT</button>
+  </form>
+</div>
+
+<script>
+function switchTab(tab) {
+  document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+  document.getElementById('formLogin').classList.toggle('active', tab === 'login');
+  document.getElementById('formRegister').classList.toggle('active', tab === 'register');
+  showMsg('', '');
+}
+
+function showMsg(text, type) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg' + (type ? ' ' + type : '');
+}
+
+async function submitLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  showMsg('Authenticating...', 'info');
+  try {
+    const r = await fetch('/auth', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: 'login', email, password})
+    });
+    const d = await r.json();
+    if (d.success) { showMsg('Access granted. Loading...', 'success'); setTimeout(() => location.href = d.redirect || '/', 600); }
+    else showMsg(d.message || 'Login failed.', 'error');
+  } catch { showMsg('Connection error.', 'error'); }
+}
+
+async function submitRegister(e) {
+  e.preventDefault();
+  const name = document.getElementById('regName').value;
+  const email = document.getElementById('regEmail').value;
+  const password = document.getElementById('regPassword').value;
+  const confirm = document.getElementById('regConfirm').value;
+  if (password !== confirm) { showMsg('Passwords do not match.', 'error'); return; }
+  showMsg('Creating account...', 'info');
+  try {
+    const r = await fetch('/auth', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: 'register', name, email, password})
+    });
+    const d = await r.json();
+    if (d.success) { showMsg('Account created! Loading...', 'success'); setTimeout(() => location.href = d.redirect || '/', 600); }
+    else showMsg(d.message || 'Registration failed.', 'error');
+  } catch { showMsg('Connection error.', 'error'); }
+}
+
+async function voiceLogin() {
+  const btn = document.getElementById('voiceBtn');
+  btn.classList.add('listening');
+  btn.textContent = 'Listening...';
+  showMsg('Speak now — identifying your voice...', 'info');
+  try {
+    const r = await fetch('/voice_login', { method: 'POST' });
+    const d = await r.json();
+    if (d.success) {
+      showMsg(`Voice recognized: ${d.user} (${Math.round(d.confidence * 100)}% confidence)`, 'success');
+      setTimeout(() => location.href = d.redirect || '/', 800);
+    } else {
+      showMsg(d.message || 'Voice not recognized.', 'error');
+    }
+  } catch { showMsg('Voice login error.', 'error'); }
+  finally {
+    btn.classList.remove('listening');
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1 1.93c-3.94-.49-7-3.85-7-7.93H2c0 4.97 3.53 9.11 8 9.9V22h4v-4.07c4.47-.79 8-4.93 8-9.9h-2c0 4.08-3.06 7.44-7 7.93V15h-2v.93z"/></svg> VOICE LOGIN';
+  }
+}
+</script>
+</body>
+</html>

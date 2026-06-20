@@ -1,0 +1,37 @@
+[INFO   ] Logger: Record log in D:\ai\AI_Assistant\.kivy\logs\kivy_26-04-10_1.txt
+[INFO   ] deps: Successfully imported "kivy_deps.angle" 0.4.0
+[INFO   ] deps: Successfully imported "kivy_deps.glew" 0.3.1
+[INFO   ] deps: Successfully imported "kivy_deps.sdl2" 0.8.0
+[INFO   ] Kivy: v2.3.1
+[INFO   ] Kivy: Installed at "D:\ai\venv311\Lib\site-packages\kivy\__init__.py"
+[INFO   ] Python: v3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]
+[INFO   ] Python: Interpreter at "D:\ai\venv311\Scripts\python.exe"
+[INFO   ] Logger: Purge log fired. Processing...
+[INFO   ] Logger: Purge finished!
+[INFO   ] Factory: 195 symbols loaded
+[INFO   ] Image: Providers: img_tex, img_dds, img_sdl2, img_pil (img_ffpyplayer ignored)
+[INFO   ] Text: Provider: sdl2
+[INFO   ] Window: Provider: sdl2
+[INFO   ] GL: Using the "OpenGL" graphics system
+[INFO   ] GL: GLEW initialization succeeded
+[INFO   ] GL: Backend used <glew>
+[INFO   ] GL: OpenGL version <b'4.6.0 - Build 27.20.100.8729'>
+[INFO   ] GL: OpenGL vendor <b'Intel'>
+[INFO   ] GL: OpenGL renderer <b'Intel(R) UHD Graphics 630'>
+[INFO   ] GL: OpenGL parsed version: 4, 6
+[INFO   ] GL: Shading version <b'4.60 - Build 27.20.100.8729'>
+[INFO   ] GL: Texture max size <16384>
+[INFO   ] GL: Texture max units <32>
+[INFO   ] Window: auto add sdl2 input provider
+[INFO   ] Window: virtual keyboard not allowed, single mode, not docked
+[WARNING] stderr: D:\ai\AI_Assistant\jarvis_ai_brain.py:46: FutureWarning: 
+[WARNING] stderr: 
+[WARNING] stderr: All support for the `google.generativeai` package has ended. It will no longer be receiving 
+[WARNING] stderr: updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+[WARNING] stderr: See README for more details:
+[WARNING] stderr: 
+[WARNING] stderr: https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+[WARNING] stderr: 
+[WARNING] stderr:   import google.generativeai as _genai
+[INFO   ] GL: NPOT texture support is available
+[INFO   ] Base: Start application main loop

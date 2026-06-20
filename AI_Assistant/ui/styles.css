@@ -142,12 +142,53 @@ button {
   color: #dffcf6;
   border: 1px solid rgba(45, 212, 191, 0.18);
   font-size: 0.78rem;
+  transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.status-chip::before {
+  content: '';
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  animation: chipPulse 2.4s ease-in-out infinite;
+}
+
+.status-chip.subtle::before {
+  background: var(--muted);
+  box-shadow: none;
+  animation: none;
+}
+
+@keyframes chipPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.82); }
 }
 
 .status-chip.subtle {
   background: rgba(255, 255, 255, 0.05);
   color: var(--sub);
   border-color: var(--line);
+}
+
+.status-chip[data-tone="ok"] {
+  background: rgba(45, 212, 191, 0.14);
+  color: #dffcf6;
+  border-color: rgba(45, 212, 191, 0.28);
+}
+
+.status-chip[data-tone="danger"] {
+  background: rgba(251, 113, 133, 0.12);
+  color: #ffe4e9;
+  border-color: rgba(251, 113, 133, 0.28);
+}
+
+.status-chip[data-tone="danger"]::before {
+  background: var(--danger);
+  box-shadow: 0 0 6px var(--danger);
+  animation: none;
 }
 
 .icon-button {
@@ -182,7 +223,22 @@ button {
 .tiny-button:hover,
 .module-tab:hover,
 .drawer-list button:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.22);
+}
+
+.primary-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(45,212,191,0.28);
+  filter: brightness(1.08);
+}
+
+.primary-button:active,
+.ghost-button:active,
+.tiny-button:active,
+.chip:active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 0.1s;
 }
 
 .main-grid {
@@ -252,7 +308,7 @@ button {
 .module-tab,
 .drawer-list button {
   border: 1px solid transparent;
-  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), background 0.22s ease, border-color 0.22s ease, color 0.22s ease, box-shadow 0.25s ease, filter 0.2s ease;
 }
 
 .primary-button,
@@ -376,11 +432,11 @@ button {
 .panel {
   display: none;
   padding: 4px;
-  animation: panelFade 0.3s ease;
 }
 
 .panel.active {
   display: block;
+  animation: panelSlideIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .panel-head {
@@ -406,15 +462,53 @@ button {
   min-height: 280px;
   max-height: 44vh;
   overflow-y: auto;
-  padding-right: 6px;
+  padding-right: 8px;
   display: grid;
-  gap: 12px;
+  gap: 14px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(45,212,191,0.2) transparent;
+}
+
+.chat-log::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chat-log::-webkit-scrollbar-thumb {
+  background: rgba(45,212,191,0.22);
+  border-radius: 4px;
+}
+
+/* Typing indicator (three bouncing dots) */
+.typing-indicator .bubble {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 16px;
+  animation: bubbleWobbleIn 0.4s cubic-bezier(0.34,1.8,0.64,1) both;
+}
+
+.typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: typingBounce 1.2s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-dot:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0) scale(1); opacity: 0.5; }
+  30%           { transform: translateY(-7px) scale(1.15); opacity: 1; }
 }
 
 .message {
   display: flex;
   gap: 10px;
   align-items: flex-start;
+  animation: messageRowIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .message.ai {
@@ -423,6 +517,7 @@ button {
 
 .message.user {
   justify-content: flex-end;
+  animation: messageRowInUser 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .message.user .avatar {
@@ -444,16 +539,94 @@ button {
   font-weight: 800;
   background: rgba(45, 212, 191, 0.18);
   border: 1px solid rgba(45, 212, 191, 0.2);
+  flex-shrink: 0;
+  animation: avatarBounce 0.5s cubic-bezier(0.34,1.8,0.64,1) both;
+  transition: transform 0.2s ease;
+}
+
+.avatar:hover {
+  transform: rotate(-8deg) scale(1.12);
+}
+
+@keyframes avatarBounce {
+  0%   { transform: scale(0) rotate(-20deg); opacity:0; }
+  60%  { transform: scale(1.2) rotate(8deg); opacity:1; }
+  80%  { transform: scale(0.92) rotate(-4deg); }
+  100% { transform: scale(1) rotate(0deg); }
 }
 
 .bubble {
   max-width: min(680px, 80%);
   padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: 22px 22px 22px 4px;
+  background: rgba(255, 255, 255, 0.07);
   border: 1px solid var(--line);
   color: var(--text);
-  line-height: 1.55;
+  line-height: 1.6;
+  transform-origin: bottom left;
+  animation: bubbleWobbleIn 0.55s cubic-bezier(0.34, 1.8, 0.64, 1) both;
+  backdrop-filter: blur(10px);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  position: relative;
+  word-break: break-word;
+}
+
+.bubble:hover {
+  transform: scale(1.013) rotate(-0.4deg);
+}
+
+.message.user .bubble {
+  border-radius: 22px 22px 4px 22px;
+  transform-origin: bottom right;
+  animation: bubbleWobbleInUser 0.5s cubic-bezier(0.34, 1.7, 0.64, 1) both;
+  background: rgba(251, 113, 133, 0.14);
+}
+
+.message.user .bubble:hover {
+  transform: scale(1.013) rotate(0.4deg);
+}
+
+/* Emoji reaction row under each bubble */
+.bubble-reactions {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.message:hover .bubble-reactions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reaction-btn {
+  font-size: 1rem;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.34,1.8,0.64,1), background 0.15s ease;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.reaction-btn:hover {
+  transform: scale(1.3) rotate(-8deg);
+  background: rgba(255,255,255,0.14);
+}
+
+.reaction-btn:active {
+  transform: scale(0.9);
+}
+
+.reaction-btn.reacted {
+  background: rgba(45, 212, 191, 0.18);
+  border-color: rgba(45, 212, 191, 0.35);
+  animation: reactionPop 0.4s cubic-bezier(0.34,1.8,0.64,1);
 }
 
 .quick-chips {
@@ -466,6 +639,19 @@ button {
 .chip {
   padding: 9px 13px;
   font-size: 0.88rem;
+  transition: transform 0.25s cubic-bezier(0.34,1.8,0.64,1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chip:hover {
+  transform: translateY(-3px) rotate(-1.5deg) scale(1.06);
+  background: rgba(45, 212, 191, 0.12);
+  border-color: rgba(45, 212, 191, 0.3);
+  box-shadow: 0 6px 16px rgba(45,212,191,0.18);
+}
+
+.chip:active {
+  transform: scale(0.93) rotate(0deg);
+  transition-duration: 0.1s;
 }
 
 .composer,
@@ -476,8 +662,98 @@ button {
 }
 
 .composer {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   margin-top: 10px;
+  gap: 8px;
+}
+
+.emoji-toggle-btn {
+  padding: 11px 13px;
+  font-size: 1.1rem;
+  border-radius: 14px;
+  line-height: 1;
+  transition: transform 0.3s cubic-bezier(0.34,1.8,0.64,1), background 0.2s ease;
+}
+
+.emoji-toggle-btn:hover {
+  transform: rotate(-15deg) scale(1.18);
+  background: rgba(45,212,191,0.12);
+}
+
+.emoji-toggle-btn.active {
+  transform: rotate(20deg) scale(1.1);
+  background: rgba(45,212,191,0.16);
+  border-color: rgba(45,212,191,0.3);
+}
+
+/* Emoji quick-bar */
+.emoji-bar {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line);
+  animation: emojiBarSlide 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+
+.emoji-bar.open {
+  display: flex;
+}
+
+@keyframes emojiBarSlide {
+  from { opacity:0; transform:translateY(-8px) scale(0.95); }
+  to   { opacity:1; transform:none; }
+}
+
+.emoji-btn {
+  font-size: 1.3rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 4px 6px;
+  cursor: pointer;
+  line-height: 1.3;
+  transition: transform 0.22s cubic-bezier(0.34,1.8,0.64,1), background 0.15s ease;
+  color: inherit;
+}
+
+.emoji-btn:hover {
+  transform: scale(1.45) rotate(-8deg) translateY(-3px);
+  background: rgba(255,255,255,0.08);
+}
+
+.emoji-btn:active {
+  transform: scale(0.88);
+  transition-duration: 0.08s;
+}
+
+/* Typing indicator */
+.typing-indicator .bubble {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 18px;
+  min-width: 56px;
+}
+
+.typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: typingBounce 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-dot:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0) scale(1);    opacity: 0.45; }
+  30%           { transform: translateY(-8px) scale(1.2); opacity: 1; }
 }
 
 .composer input,
@@ -611,15 +887,36 @@ button {
   width: min(320px, 88vw);
   height: 100vh;
   z-index: 30;
-  background: rgba(7, 17, 31, 0.96);
+  background: rgba(7, 17, 31, 0.97);
   border-left: 1px solid var(--line);
   box-shadow: -28px 0 72px rgba(0, 0, 0, 0.3);
   padding: 18px;
-  transition: right 0.25s ease;
+  transition: right 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+  backdrop-filter: blur(24px);
 }
 
 .drawer.open {
   right: 0;
+}
+
+.drawer-list button {
+  transition: background 0.18s ease, transform 0.22s cubic-bezier(0.34,1.56,0.64,1), color 0.18s ease;
+}
+
+.drawer.open .drawer-list button {
+  animation: drawerItemIn 0.35s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+.drawer.open .drawer-list button:nth-child(1) { animation-delay: 0.04s; }
+.drawer.open .drawer-list button:nth-child(2) { animation-delay: 0.07s; }
+.drawer.open .drawer-list button:nth-child(3) { animation-delay: 0.10s; }
+.drawer.open .drawer-list button:nth-child(4) { animation-delay: 0.13s; }
+.drawer.open .drawer-list button:nth-child(5) { animation-delay: 0.16s; }
+.drawer.open .drawer-list button:nth-child(6) { animation-delay: 0.19s; }
+
+@keyframes drawerItemIn {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 .drawer-head {
@@ -643,16 +940,18 @@ button {
 .drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.45);
+  background: rgba(2, 6, 23, 0.5);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.36s cubic-bezier(0.22, 1, 0.36, 1);
   z-index: 20;
+  backdrop-filter: blur(0px);
 }
 
 .drawer-backdrop.open {
   opacity: 1;
   pointer-events: auto;
+  backdrop-filter: blur(3px);
 }
 
 @keyframes floatPulse {
@@ -660,15 +959,52 @@ button {
   50% { transform: translateY(-4px) scale(1.015); }
 }
 
-@keyframes panelFade {
+@keyframes panelSlideIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(18px) scale(0.978);
+    filter: blur(2px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+    filter: blur(0);
   }
+}
+
+@keyframes bubbleWobbleIn {
+  0%   { opacity:0; transform: translateY(18px) scale(0.6) rotate(-4deg); }
+  45%  { opacity:1; transform: translateY(-6px) scale(1.08) rotate(2deg); }
+  65%  { transform: translateY(3px) scale(0.97) rotate(-1deg); }
+  80%  { transform: translateY(-2px) scale(1.02) rotate(0.5deg); }
+  100% { transform: translateY(0) scale(1) rotate(0deg); }
+}
+
+@keyframes bubbleWobbleInUser {
+  0%   { opacity:0; transform: translateY(18px) scale(0.6) rotate(4deg); }
+  45%  { opacity:1; transform: translateY(-6px) scale(1.08) rotate(-2deg); }
+  65%  { transform: translateY(3px) scale(0.97) rotate(1deg); }
+  80%  { transform: translateY(-2px) scale(1.02) rotate(-0.5deg); }
+  100% { transform: translateY(0) scale(1) rotate(0deg); }
+}
+
+@keyframes messageRowIn {
+  0%   { opacity:0; transform: translateX(-20px) scale(0.92); }
+  60%  { transform: translateX(4px) scale(1.01); }
+  100% { opacity:1; transform: translateX(0) scale(1); }
+}
+
+@keyframes messageRowInUser {
+  0%   { opacity:0; transform: translateX(20px) scale(0.92); }
+  60%  { transform: translateX(-4px) scale(1.01); }
+  100% { opacity:1; transform: translateX(0) scale(1); }
+}
+
+@keyframes reactionPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.5) rotate(-12deg); }
+  70%  { transform: scale(0.9) rotate(6deg); }
+  100% { transform: scale(1) rotate(0deg); }
 }
 
 @media (max-width: 1100px) {

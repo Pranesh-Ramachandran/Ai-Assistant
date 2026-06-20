@@ -135,6 +135,7 @@ class _ConversationMemory:
         return []
 
     def _save(self) -> None:
+        self._trim()  # always trim before writing to prevent unbounded file growth
         try:
             os.makedirs(os.path.dirname(_HISTORY_FILE), exist_ok=True)
             with open(_HISTORY_FILE, "w", encoding="utf-8") as f:

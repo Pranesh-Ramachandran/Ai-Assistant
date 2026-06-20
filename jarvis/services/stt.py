@@ -38,6 +38,14 @@ except ImportError:
     _NP = False
 
 try:
+    import webrtcvad as _webrtcvad
+    _VAD = _webrtcvad.Vad(2)  # aggressiveness 0-3; 2 = balanced
+    _WEBRTCVAD = True
+except Exception:
+    _VAD = None
+    _WEBRTCVAD = False
+
+try:
     import azure.cognitiveservices.speech as speechsdk
     _AZURE = True
 except ImportError:
@@ -125,9 +133,17 @@ def _listen_google() -> str:
                 while time.time() < deadline:
                     data = q.get()
                     if _NP:
-                        frame = np.frombuffer(data, dtype="int16").astype("float32")
-                        rms = float(np.sqrt(np.mean(frame ** 2)))
-                        is_speech = rms > 300
+                        if _WEBRTCVAD:
+                            # webrtcvad expects 16-bit PCM, 10/20/30ms frames at 8/16/32/48 kHz
+                            # CHUNK=320 @ 16kHz = 20ms — exactly what webrtcvad needs
+                            try:
+                                is_speech = _VAD.is_speech(data, RATE)
+                            except Exception:
+                                frame = np.frombuffer(data, dtype="int16").astype("float32")
+                                is_speech = float(np.sqrt(np.mean(frame ** 2))) > 300
+                        else:
+                            frame = np.frombuffer(data, dtype="int16").astype("float32")
+                            is_speech = float(np.sqrt(np.mean(frame ** 2))) > 300
                     else:
                         is_speech = True
                     if is_speech:

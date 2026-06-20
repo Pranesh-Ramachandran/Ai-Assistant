@@ -14,6 +14,7 @@ jarvis/
 │   ├── tts.py          # Text-to-speech (pyttsx3 → gTTS fallback)
 │   ├── stt.py          # Speech-to-text (Azure → Google → Vosk fallback)
 │   ├── data_collector.py  # Weather (wttr.in) + Wikipedia
+│   ├── document_intelligence.py  # PDF parsing, OCR, content analysis
 │   └── iot.py          # Local smart device control
 ├── ui/
 │   └── app.py          # Flask web UI
@@ -66,3 +67,65 @@ pytest jarvis/tests/ -v --cov=jarvis
 | `JARVIS_STT_ENGINE` | `auto` / `google` / `azure` / `vosk` | `google` |
 | `JARVIS_TTS_MODE` | `fast` (pyttsx3) / `hq` (edge-tts) | `fast` |
 | `VOSK_MODEL_PATH` | Path to Vosk model directory | `models/vosk-model-small-en-us-0.15` |
+
+## 🆕 Document Intelligence
+
+JARVIS now includes advanced document processing capabilities:
+
+### Features
+- **📄 PDF Processing** — Extract text from PDF documents
+- **🔍 OCR** — Extract text from images (JPG, PNG, TIFF, BMP)
+- **📝 Text Analysis** — Process TXT, MD, RTF files
+- **💬 Q&A** — Ask questions about document content
+- **📊 Summarization** — Generate document summaries
+- **🏗️ Structure Analysis** — Analyze document metadata and structure
+
+### Usage
+
+**Voice Commands:**
+```
+"analyze document C:/path/to/file.pdf"
+"summarize document report.txt"
+"extract text from image.jpg"
+"what document formats do you support?"
+```
+
+**Web Interface:**
+1. Click the 📄 document button in the web UI
+2. Select a file (PDF, image, or text)
+3. Optionally ask a question about the content
+4. Get instant analysis or answers
+
+**Supported Formats:**
+- **PDF**: `.pdf`
+- **Images**: `.jpg`, `.jpeg`, `.png`, `.bmp`, `.tiff`, `.tif`
+- **Text**: `.txt`, `.md`, `.rtf`
+
+### Installation
+
+Document intelligence requires additional packages:
+
+```bash
+# For PDF processing
+pip install PyPDF2
+
+# For OCR (requires Tesseract)
+pip install pytesseract pillow
+
+# Install Tesseract OCR engine:
+# Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki
+# Linux: sudo apt-get install tesseract-ocr
+# macOS: brew install tesseract
+```
+
+### API Endpoints
+
+- `POST /document_upload` — Upload and process documents
+- `POST /document_analyze` — Analyze document structure
+- `GET /document_formats` — List supported formats
+
+### Testing
+
+```bash
+python test_document_intelligence.py
+```

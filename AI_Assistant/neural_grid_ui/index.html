@@ -25,8 +25,11 @@
     #offline-banner.show { display:block; }
 
     /* App entry animation */
-    #app { animation: app-enter 0.6s ease-out; }
-    @keyframes app-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    #app { animation: app-enter 0.72s cubic-bezier(0.22, 1, 0.36, 1); }
+    @keyframes app-enter {
+      from { opacity: 0; transform: translateY(22px) scale(0.96); filter: blur(4px); }
+      to   { opacity: 1; transform: none; filter: blur(0); }
+    }
 
     /* Header */
     header { width:100%; max-width:520px; display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
@@ -42,17 +45,20 @@
     /* Panel */
     #panel { width:100%; max-width:520px; display:flex; flex-direction:column; gap:10px; }
     .tabs  { display:flex; background:var(--bg2); border-radius:10px; padding:3px; gap:1px; }
-    .tab   { flex:1; font-size:11px; font-weight:500; letter-spacing:.3px; border:none; border-radius:8px; padding:7px 4px; background:none; color:var(--sub); cursor:pointer; transition:all .2s; }
-    .tab:hover  { color:var(--text); background:rgba(128,128,128,.08); }
-    .tab.active { background:var(--card); color:var(--accent,#0284C7); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.10); }
+    .tab   { flex:1; font-size:11px; font-weight:500; letter-spacing:.3px; border:none; border-radius:8px; padding:7px 4px; background:none; color:var(--sub); cursor:pointer; transition:all 0.25s cubic-bezier(0.22,1,0.36,1); }
+    .tab:hover  { color:var(--text); background:rgba(128,128,128,.08); transform:translateY(-1px); }
+    .tab.active { background:var(--card); color:var(--accent,#0284C7); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.10); transform:none; }
     hr { border:none; border-top:1px solid var(--border); }
 
     /* Chat — increased height for usability */
     #log { display:flex; flex-direction:column; gap:4px; max-height:160px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
     #log::-webkit-scrollbar { width:4px; }
     #log::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
-    .msg { font-size:12px; padding:5px 11px; border-radius:8px; max-width:88%; animation:up .25s ease; line-height:1.5; }
-    @keyframes up { from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none} }
+    .msg { font-size:12px; padding:5px 11px; border-radius:8px; max-width:88%; animation:bubbleUp .3s cubic-bezier(0.34,1.56,0.64,1) both; line-height:1.5; }
+    @keyframes bubbleUp {
+      from { opacity:0; transform:translateY(10px) scale(0.9); }
+      to   { opacity:1; transform:none; }
+    }
     .msg.u { align-self:flex-end; background:var(--bg2); color:var(--text); font-weight:500; }
     .msg.j { align-self:flex-start; background:var(--card); color:var(--sub); border:1px solid var(--border); }
     .msg.j.loading { font-style:italic; }
@@ -63,10 +69,52 @@
     input::placeholder { color:var(--sub); }
     input:focus, select:focus { border-color:var(--accent,#0284C7); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,#0284C7) 12%,transparent); }
     #inp { flex:1; }
-    .ib { width:40px; height:40px; border-radius:9px; border:1px solid var(--border); background:var(--bg2); color:var(--sub); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .2s; flex-shrink:0; }
-    .ib:hover { border-color:var(--accent,#0284C7); color:var(--accent,#0284C7); }
+    .ib { width:40px; height:40px; border-radius:9px; border:1px solid var(--border); background:var(--bg2); color:var(--sub); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform 0.22s cubic-bezier(0.34,1.56,0.64,1), border-color 0.18s, color 0.18s, background 0.18s, box-shadow 0.22s; flex-shrink:0; }
+    .ib:hover { border-color:var(--accent,#0284C7); color:var(--accent,#0284C7); transform:translateY(-2px) scale(1.06); box-shadow:0 4px 14px rgba(2,132,199,.18); }
+    .ib:active { transform:scale(0.93); transition-duration:0.08s; }
+
+    /* Quick-action grid */
+    .qa-section { margin-top:8px; }
+    .qa-label { font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--sub); margin-bottom:5px; padding-left:2px; }
+    .qa-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:10px; }
+    .qa-btn {
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:3px; padding:10px 4px 8px;
+      border-radius:12px; border:1px solid var(--border);
+      background:var(--card); color:var(--text);
+      cursor:pointer; font-family:'Inter',sans-serif;
+      transition: transform 0.26s cubic-bezier(0.34,1.56,0.64,1),
+                  background 0.18s, border-color 0.18s, box-shadow 0.22s;
+      animation: qaIn 0.35s cubic-bezier(0.22,1,0.36,1) both;
+    }
+    .qa-btn:hover {
+      background:color-mix(in srgb,var(--accent,#0284C7) 8%,var(--card));
+      border-color:var(--accent,#0284C7);
+      transform:translateY(-3px) scale(1.04);
+      box-shadow:0 6px 18px rgba(2,132,199,.16);
+    }
+    .qa-btn:active { transform:scale(0.94) translateY(0); transition-duration:0.08s; }
+    .qa-btn .qa-icon { font-size:1.4rem; line-height:1; }
+    .qa-btn .qa-lbl { font-size:10px; font-weight:500; color:var(--sub); text-align:center; line-height:1.2; }
+    @keyframes qaIn {
+      from { opacity:0; transform:scale(0.8) translateY(8px); }
+      to   { opacity:1; transform:none; }
+    }
+    /* stagger each qa-btn */
+    .qa-btn:nth-child(1){animation-delay:.03s} .qa-btn:nth-child(2){animation-delay:.06s}
+    .qa-btn:nth-child(3){animation-delay:.09s} .qa-btn:nth-child(4){animation-delay:.12s}
+    .qa-btn:nth-child(5){animation-delay:.15s} .qa-btn:nth-child(6){animation-delay:.18s}
+    .qa-btn:nth-child(7){animation-delay:.21s} .qa-btn:nth-child(8){animation-delay:.24s}
+    .qa-btn:nth-child(9){animation-delay:.27s}
+
+    /* Collapsible actions toggle */
+    #qa-toggle-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; cursor:pointer; user-select:none; }
+    #qa-toggle-row span { font-size:10px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--sub); }
+    #qa-toggle-arrow { font-size:11px; color:var(--sub); transition:transform 0.25s ease; }
+    #qa-actions.collapsed { display:none; }
+    #qa-toggle-row.open #qa-toggle-arrow { transform:rotate(180deg); }
     #sb { background:var(--accent,#0284C7); color:#fff; border-color:var(--accent,#0284C7); position:relative; }
-    #sb:hover { opacity:.88; }
+    #sb:hover { opacity:.88; transform:translateY(-2px) scale(1.06); box-shadow:0 6px 18px rgba(2,132,199,.35); }
     #sb.loading { color: transparent; pointer-events: none; }
     #sb.loading::after { content: ''; position: absolute; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: sb-spin .6s linear infinite; }
     @keyframes sb-spin { to { transform: rotate(360deg); } }
@@ -80,10 +128,22 @@
     /* Hamburger */
     #menu-btn { background:none; border:none; cursor:pointer; padding:4px; color:var(--sub); font-size:20px; line-height:1; }
     #menu-btn:hover { color:var(--text); }
-    #menu-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.3); z-index:10; }
-    #menu-overlay.open { display:block; }
-    #menu-drawer { position:fixed; top:0; right:0; height:100%; width:210px; background:var(--drawer); box-shadow:-4px 0 20px rgba(0,0,0,.18); z-index:11; padding:20px 16px; display:flex; flex-direction:column; gap:4px; transform:translateX(100%); transition:transform .22s ease; }
+    #menu-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.3); z-index:10; backdrop-filter:blur(3px); transition:opacity 0.3s ease; }
+    #menu-overlay.open { display:block; animation:overlayIn 0.3s ease; }
+    @keyframes overlayIn { from{opacity:0} to{opacity:1} }
+    #menu-drawer { position:fixed; top:0; right:0; height:100%; width:210px; background:var(--drawer); box-shadow:-4px 0 20px rgba(0,0,0,.18); z-index:11; padding:20px 16px; display:flex; flex-direction:column; gap:4px; transform:translateX(100%); transition:transform 0.36s cubic-bezier(0.22,1,0.36,1); backdrop-filter:blur(12px); }
     #menu-drawer.open { transform:none; }
+    #menu-drawer.open .menu-item { animation:menuItemIn 0.3s cubic-bezier(0.22,1,0.36,1) both; }
+    #menu-drawer.open .menu-item:nth-child(1){ animation-delay:0.04s }
+    #menu-drawer.open .menu-item:nth-child(2){ animation-delay:0.07s }
+    #menu-drawer.open .menu-item:nth-child(3){ animation-delay:0.10s }
+    #menu-drawer.open .menu-item:nth-child(4){ animation-delay:0.13s }
+    #menu-drawer.open .menu-item:nth-child(5){ animation-delay:0.16s }
+    #menu-drawer.open .menu-item:nth-child(6){ animation-delay:0.19s }
+    #menu-drawer.open .menu-item:nth-child(7){ animation-delay:0.22s }
+    #menu-drawer.open .menu-item:nth-child(8){ animation-delay:0.25s }
+    #menu-drawer.open .menu-item:nth-child(9){ animation-delay:0.28s }
+    @keyframes menuItemIn { from{opacity:0;transform:translateX(16px)} to{opacity:1;transform:none} }
     .menu-title { font-size:10px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:var(--sub); margin-bottom:6px; }
     .menu-item { font-size:13px; font-weight:500; padding:9px 12px; border-radius:8px; border:none; background:none; color:var(--text); cursor:pointer; text-align:left; width:100%; transition:background .15s; }
     .menu-item:hover { background:var(--bg2); }
@@ -94,6 +154,23 @@
     #abars { display:flex; align-items:flex-end; gap:2px; height:18px; }
     .ab { width:3px; border-radius:2px; background:var(--border); min-height:3px; transition:height .09s,background .5s; }
     #ftxt { font-size:10px; color:var(--sub); letter-spacing:.3px; }
+
+    /* Panel view transitions */
+    [id^="v-"] { animation: viewIn 0.32s cubic-bezier(0.22,1,0.36,1) both; }
+    @keyframes viewIn {
+      from { opacity:0; transform:translateY(10px) scale(0.97); }
+      to   { opacity:1; transform:none; }
+    }
+
+    /* Vision preview enhancement */
+    #vis-preview { transition: opacity 0.4s ease; }
+    .vis-live #vis-preview { box-shadow: 0 0 0 2px rgba(2,132,199,0.5); }
+    #vis-live-badge { transition: background 0.3s ease, color 0.3s ease; }
+
+    /* Button micro-animations */
+    .ib { transition: all 0.22s cubic-bezier(0.34,1.56,0.64,1); }
+    .ib:hover { transform: translateY(-2px) scale(1.04); }
+    .ib:active { transform: translateY(0) scale(0.95); transition-duration: 0.1s; }
   </style>
 </head>
 <body>
@@ -156,9 +233,114 @@
         <button class="ib" id="clr" title="Clear History">&#128465;</button>
       </div>
       <div style="font-size:9px; color:var(--sub); text-align:center; margin-top:4px;">Hint: Press <kbd>Ctrl+M</kbd> to toggle microphone</div>
-      <div class="row" style="margin-top:6px">
+
+      <!-- Quick-action music row -->
+      <div class="row" style="margin-top:7px">
         <input id="music-input" type="text" placeholder="Song, artist or playlist…" style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:9px;padding:7px 11px;font:13px Inter,sans-serif;color:var(--text);outline:none" />
         <button class="ib" style="width:auto;padding:0 12px;font-size:11px" id="music-btn">&#127925; Play</button>
+      </div>
+
+      <!-- Collapsible quick-action grid -->
+      <div style="margin-top:10px;">
+        <div id="qa-toggle-row" class="open">
+          <span>&#9889; Quick Actions</span>
+          <span id="qa-toggle-arrow">&#9660;</span>
+        </div>
+        <div id="qa-actions">
+
+          <!-- Row: Basics -->
+          <div class="qa-label">General</div>
+          <div class="qa-grid">
+            <button class="qa-btn" data-qa="What time is it?">
+              <span class="qa-icon">&#128336;</span><span class="qa-lbl">Time</span>
+            </button>
+            <button class="qa-btn" data-qa="What's the weather today?">
+              <span class="qa-icon">&#127780;</span><span class="qa-lbl">Weather</span>
+            </button>
+            <button class="qa-btn" data-qa="Tell me a joke">
+              <span class="qa-icon">&#128514;</span><span class="qa-lbl">Joke</span>
+            </button>
+            <button class="qa-btn" data-qa="What can you do?">
+              <span class="qa-icon">&#129504;</span><span class="qa-lbl">Capabilities</span>
+            </button>
+            <button class="qa-btn" data-qa="What's my status?">
+              <span class="qa-icon">&#128202;</span><span class="qa-lbl">Status</span>
+            </button>
+            <button class="qa-btn" data-qa="Tell me something interesting">
+              <span class="qa-icon">&#128161;</span><span class="qa-lbl">Fun Fact</span>
+            </button>
+          </div>
+
+          <!-- Row: System -->
+          <div class="qa-label">System</div>
+          <div class="qa-grid">
+            <button class="qa-btn" data-qa="Show CPU and RAM usage">
+              <span class="qa-icon">&#128187;</span><span class="qa-lbl">CPU / RAM</span>
+            </button>
+            <button class="qa-btn" data-qa="Take a screenshot">
+              <span class="qa-icon">&#128444;</span><span class="qa-lbl">Screenshot</span>
+            </button>
+            <button class="qa-btn" data-qa="What processes are running?">
+              <span class="qa-icon">&#9881;</span><span class="qa-lbl">Processes</span>
+            </button>
+            <button class="qa-btn" data-qa="What's my IP address?">
+              <span class="qa-icon">&#127760;</span><span class="qa-lbl">IP Address</span>
+            </button>
+            <button class="qa-btn" data-qa="How much disk space is left?">
+              <span class="qa-icon">&#128190;</span><span class="qa-lbl">Disk Space</span>
+            </button>
+            <button class="qa-btn" data-qa="Lock the screen">
+              <span class="qa-icon">&#128274;</span><span class="qa-lbl">Lock Screen</span>
+            </button>
+          </div>
+
+          <!-- Row: Smart Home -->
+          <div class="qa-label">Smart Home</div>
+          <div class="qa-grid">
+            <button class="qa-btn" data-qa="Turn on bedroom light">
+              <span class="qa-icon">&#128161;</span><span class="qa-lbl">Lights On</span>
+            </button>
+            <button class="qa-btn" data-qa="Turn off all lights">
+              <span class="qa-icon">&#127774;</span><span class="qa-lbl">Lights Off</span>
+            </button>
+            <button class="qa-btn" data-qa="Set movie scene">
+              <span class="qa-icon">&#127917;</span><span class="qa-lbl">Movie Mode</span>
+            </button>
+            <button class="qa-btn" data-qa="Set sleep scene">
+              <span class="qa-icon">&#128564;</span><span class="qa-lbl">Sleep Mode</span>
+            </button>
+            <button class="qa-btn" data-qa="What devices are online?">
+              <span class="qa-icon">&#127968;</span><span class="qa-lbl">Devices</span>
+            </button>
+            <button class="qa-btn" data-qa="Set brightness to 50 percent">
+              <span class="qa-icon">&#9728;</span><span class="qa-lbl">Brightness</span>
+            </button>
+          </div>
+
+          <!-- Row: Productivity -->
+          <div class="qa-label">Productivity</div>
+          <div class="qa-grid">
+            <button class="qa-btn" data-qa="What's on my calendar today?">
+              <span class="qa-icon">&#128197;</span><span class="qa-lbl">Calendar</span>
+            </button>
+            <button class="qa-btn" data-qa="Set an alarm for 7am">
+              <span class="qa-icon">&#9200;</span><span class="qa-lbl">Set Alarm</span>
+            </button>
+            <button class="qa-btn" data-qa="Remind me in 30 minutes">
+              <span class="qa-icon">&#128276;</span><span class="qa-lbl">Reminder</span>
+            </button>
+            <button class="qa-btn" data-qa="Search Google for latest news">
+              <span class="qa-icon">&#128240;</span><span class="qa-lbl">News</span>
+            </button>
+            <button class="qa-btn" data-qa="Translate hello to Tamil">
+              <span class="qa-icon">&#127760;</span><span class="qa-lbl">Translate</span>
+            </button>
+            <button class="qa-btn" data-qa="Open YouTube">
+              <span class="qa-icon">&#127909;</span><span class="qa-lbl">YouTube</span>
+            </button>
+          </div>
+
+        </div>
       </div>
     </div>
 
@@ -414,11 +596,11 @@
       </div>
 
       <!-- Camera preview -->
-      <div style="margin-top:8px;border:1px solid var(--border);border-radius:14px;overflow:hidden;position:relative;background:#000;box-shadow:0 14px 30px rgba(0,0,0,.22)">
-        <video id="vis-preview" autoplay playsinline muted style="width:100%;height:220px;object-fit:cover;display:block"></video>
+      <div style="margin-top:8px;border:1px solid var(--border);border-radius:14px;overflow:hidden;position:relative;background:#000;box-shadow:0 14px 30px rgba(0,0,0,.22);transition:border-color 0.4s ease,box-shadow 0.4s ease">
+        <video id="vis-preview" autoplay playsinline muted style="width:100%;height:220px;object-fit:cover;display:block;transition:opacity 0.4s ease"></video>
         <!-- uploaded image preview -->
         <img id="vis-img-preview" style="display:none;width:100%;height:220px;object-fit:contain;background:#111" />
-        <div id="vis-live-badge" style="position:absolute;left:10px;top:10px;padding:5px 10px;border-radius:999px;background:rgba(15,23,42,.8);color:#E2E8F0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;border:1px solid rgba(255,255,255,.12)">Camera off</div>
+        <div id="vis-live-badge" style="position:absolute;left:10px;top:10px;padding:5px 10px;border-radius:999px;background:rgba(15,23,42,.8);color:#E2E8F0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;border:1px solid rgba(255,255,255,.12);transition:all 0.3s ease">Camera off</div>
         <!-- permission prompt overlay -->
         <div id="vis-perm-overlay" style="display:none;position:absolute;inset:0;background:rgba(15,23,42,.92);flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px">
           <div style="font-size:13px;color:#E2E8F0;text-align:center">JARVIS needs camera access</div>
@@ -481,11 +663,18 @@ let ttsSyncTimer = null;
 let visionStream = null, currentView = 'chat';
 
 const PAL = {
-  idle:     { r:.47,g:.54,b:.68, hex:'#94A3B8', name:'Idle',      sub:'Waiting for input',        pillBg:'#F8FAFF', pillFg:'#6B7A99' },
-  listening:{ r:.01,g:.52,b:.78, hex:'#0284C7', name:'Listening', sub:'Listening… speak now',      pillBg:'#F0F9FF', pillFg:'#0284C7' },
-  thinking: { r:.48,g:.22,b:.93, hex:'#7C3AED', name:'Thinking',  sub:'Processing…',              pillBg:'#F5F3FF', pillFg:'#7C3AED' },
-  speaking: { r:.02,g:.59,b:.41, hex:'#059669', name:'Speaking',  sub:'Speaking…',                pillBg:'#ECFDF5', pillFg:'#059669' },
-  error:    { r:.86,g:.15,b:.15, hex:'#DC2626', name:'Error',     sub:'Something went wrong.',    pillBg:'#FFF5F5', pillFg:'#DC2626' },
+  idle:     { r:.47,g:.54,b:.68, hex:'#94A3B8', name:'Idle',         sub:'Waiting for input',        pillBg:'#F8FAFF', pillFg:'#6B7A99' },
+  listening:{ r:.01,g:.52,b:.78, hex:'#0284C7', name:'Listening',    sub:'Listening\u2026 speak now', pillBg:'#F0F9FF', pillFg:'#0284C7' },
+  thinking: { r:.48,g:.22,b:.93, hex:'#7C3AED', name:'Thinking',     sub:'Processing\u2026',          pillBg:'#F5F3FF', pillFg:'#7C3AED' },
+  speaking: { r:.02,g:.59,b:.41, hex:'#059669', name:'Speaking',     sub:'Speaking\u2026',            pillBg:'#ECFDF5', pillFg:'#059669' },
+  error:    { r:.86,g:.15,b:.15, hex:'#DC2626', name:'Error',        sub:'Something went wrong.',    pillBg:'#FFF5F5', pillFg:'#DC2626' },
+  music:    { r:.91,g:.27,b:.65, hex:'#E91E8C', name:'Music \u266b',  sub:'Grooving\u2026',            pillBg:'#FFF0F9', pillFg:'#E91E8C' },
+  alarm:    { r:.98,g:.45,b:.01, hex:'#F97316', name:'Alarm! \u23f0', sub:'Wake up!',                 pillBg:'#FFF7ED', pillFg:'#C2410C' },
+  success:  { r:.06,g:.78,b:.35, hex:'#10B981', name:'Done! \u2728',  sub:'Task complete!',           pillBg:'#ECFDF5', pillFg:'#059669' },
+  party:    { r:.93,g:.62,b:.01, hex:'#EDA800', name:'Party! \ud83c\udf89', sub:'Celebrate!',         pillBg:'#FFFBEB', pillFg:'#B45309' },
+  sleep:    { r:.25,g:.25,b:.45, hex:'#3B3B72', name:'Sleep \ud83d\ude34',  sub:'Goodnight\u2026',     pillBg:'#F0F0FF', pillFg:'#3B3B72' },
+  vision:   { r:.00,g:.70,b:.90, hex:'#00B4D8', name:'Vision \ud83d\udcc1', sub:'Scanning\u2026',     pillBg:'#E0F7FF', pillFg:'#0077A8' },
+  wake:     { r:.08,g:.89,b:.89, hex:'#14E3E3', name:'Wake Word \ud83c\udfa4', sub:'JARVIS detected!',pillBg:'#E0FFFE', pillFg:'#0E7490' },
 };
 
 const cv = document.getElementById('cv');
@@ -553,45 +742,126 @@ function aSpeaking(d,dist,angle,T,col,amp){
   return{alpha:.20+.40*ring+boost*Math.sin(T*10-dist*3.5)*.4*.25, radius:.80+.85*ring+boost*.3};
 }
 function aError(d,dist,angle,T,col){
-  d.glitch=d.glitch*.92+(Math.random()<.010?Math.random():0)*.1;  // less frequent flicker
+  d.glitch=d.glitch*.92+(Math.random()<.010?Math.random():0)*.1;
   const broken=Math.sin(T*3.5+d.phase*1.8)*(1-dist*.5);
   return{alpha:.12+.28*Math.max(0,broken)+d.glitch*.8, radius:.6+.6*Math.max(0,broken)+d.glitch*.9,
     cr:col.r, cg:col.g*(1-d.glitch*.5), cb:col.b*(1-d.glitch*.3)};
 }
 
+// ─── NEW ENTERTAINING STATES ─────────────────────────────────────────────────
+
+// MUSIC: concentric ripple rings pulsing outward from centre like a speaker cone
+function aMusic(d,dist,angle,T,col){
+  const beat  = Math.sin(T*6.5)*.5+.5;
+  const ring1 = Math.pow(Math.max(0,1-Math.abs(dist-.25*beat)),4);
+  const ring2 = Math.pow(Math.max(0,1-Math.abs(dist-.55+.12*Math.sin(T*4))),4);
+  const ring3 = Math.pow(Math.max(0,1-Math.abs(dist-.82)),3);
+  const wave  = Math.sin(T*8+angle*3+d.phase)*.25+.3;
+  const total = Math.max(ring1,ring2,ring3)+wave;
+  const hue=T*.5+d.phase*.3;
+  return{alpha:.15+.70*Math.min(1,total), radius:.7+.9*Math.min(1,total),
+    cr:.5+.5*Math.sin(hue), cg:.5+.5*Math.sin(hue+2.1), cb:.5+.5*Math.sin(hue+4.2)};
+}
+
+// ALARM: hard strobe orange-red siren — sharp bright/dark alternation
+function aAlarm(d,dist,angle,T,col){
+  const strobe = Math.pow(Math.max(0,Math.sin(T*7)),3);
+  const spiral = Math.sin(T*5-angle*2-dist*4+d.phase)*.4+.4;
+  const flicker= Math.random()<.04?1:0;
+  return{alpha:.08+.75*strobe+.2*spiral+.15*flicker,
+         radius:.6+1.1*strobe+.4*spiral,
+         cr:.99, cg:.28*strobe, cb:.01};
+}
+
+// SUCCESS: firework sparks burst outward then fade, repeating
+function aSuccess(d,dist,angle,T,col){
+  const burst = T-d.lastFire;
+  if(burst>1.2 && Math.random()<.012) d.lastFire=T;
+  const spark = burst<.6 ? Math.pow(1-burst/.6,1.5) : 0;
+  const radialMatch = Math.abs(dist - Math.min(.95,burst*1.6));
+  const ring = Math.exp(-radialMatch*radialMatch*90)*spark;
+  const glow  = Math.sin(T*3+d.phase)*.2+.2;
+  const hue=angle+T*.4;
+  return{alpha:.10+.80*ring+.12*glow, radius:.6+1.2*ring+.3*glow,
+    cr:.3+.7*Math.abs(Math.sin(hue)), cg:.7+.3*Math.abs(Math.sin(hue+2.1)), cb:.2+.5*Math.abs(Math.sin(hue+4.2))};
+}
+
+// PARTY: full-speed rainbow spinning vortex
+function aParty(d,dist,angle,T,col){
+  const spin  = Math.sin(T*4-angle*4-dist*5+d.phase)*.5+.5;
+  const radial= Math.exp(-Math.pow(dist-.5,2)*8);
+  const hue   = angle+T*1.2+dist*1.5;
+  return{alpha:.15+.65*spin+.15*radial, radius:.7+.9*spin+.3*radial,
+    cr:.55+.45*Math.sin(hue), cg:.55+.45*Math.sin(hue+2.09), cb:.55+.45*Math.sin(hue+4.19)};
+}
+
+// SLEEP: barely-alive slow breathe, cool indigo, dots gently drift off
+function aSleep(d,dist,angle,T,col){
+  const breathe=Math.sin(T*.55+d.phase)*.35+.35;
+  const drift  =Math.sin(T*.3+d.c*.4+d.r*.3)*.15;
+  const fade   =Math.max(0,1-dist*1.1);
+  return{alpha:.04+.18*breathe*fade+.05*drift, radius:.5+.55*breathe*fade};
+}
+
+// VISION / SCAN: bright scanline sweeps down, dim trail below it
+function aVision(d,dist,angle,T,col){
+  const scanY   = (T*.8)%1;
+  const normR   = d.r/(ROWS-1);
+  const scanHit = Math.exp(-Math.pow(normR-scanY,2)*80);
+  const trail   = (scanY-normR)>0 && (scanY-normR)<.22 ? (1-(scanY-normR)/.22)*.3 : 0;
+  const gridGlow= Math.sin(T*2+d.c*.4+d.phase)*.1+.12;
+  return{alpha:Math.min(1,.08+.75*scanHit+trail+gridGlow), radius:.6+1.0*scanHit+.2*trail,
+    cr:0, cg:.8+.2*scanHit, cb:.95+.05*scanHit};
+}
+
+// WAKE WORD: expanding cyan ripple rings from the centre
+function aWake(d,dist,angle,T,col){
+  const ripple1=Math.exp(-Math.pow(dist-.3*((T*2.5)%2),2)*60);
+  const ripple2=Math.exp(-Math.pow(dist-.3*(((T*2.5)+.7)%2),2)*60);
+  const glow   =Math.exp(-dist*dist*3)*.4;
+  const total  =Math.max(ripple1,ripple2)+glow;
+  return{alpha:.05+.85*Math.min(1,total), radius:.5+1.2*Math.min(1,total), cr:0, cg:.87, cb:.87};
+}
+
 function drawGrid(state,T,amp){
   const W=cv.width,H=cv.height,cx=W/2,cy=H/2,gw=W*.70;
   const stepX=gw/(COLS-1),stepY=gw/(ROWS-1),ox=cx-gw/2,oy=cy-gw/2,baseR=W/120;
-  const col=mixPal(PAL[curState],PAL[tgtState],blend);
-  
-  // Draw grid dots with smooth animations
+  const col=mixPal(PAL[curState]||PAL.idle, PAL[tgtState]||PAL.idle, blend);
+
   for(const d of dots){
     const px=ox+d.c*stepX, py=oy+d.r*stepY;
     const dx=(px-cx)/(gw/2), dy=(py-cy)/(gw/2);
     const dist=Math.hypot(dx,dy), angle=Math.atan2(dy,dx);
     if(dist>1.0) continue;
-    const res=state==='idle'?aIdle(d,dist,angle,T,col)
-      :state==='listening'?aListening(d,dist,angle,T,col,amp)
-      :state==='thinking'?aThinking(d,dist,angle,T,col)
-      :state==='speaking'?aSpeaking(d,dist,angle,T,col,amp)
-      :aError(d,dist,angle,T,col);
+    const res=
+        state==='idle'      ? aIdle(d,dist,angle,T,col)
+      : state==='listening' ? aListening(d,dist,angle,T,col,amp)
+      : state==='thinking'  ? aThinking(d,dist,angle,T,col)
+      : state==='speaking'  ? aSpeaking(d,dist,angle,T,col,amp)
+      : state==='music'     ? aMusic(d,dist,angle,T,col)
+      : state==='alarm'     ? aAlarm(d,dist,angle,T,col)
+      : state==='success'   ? aSuccess(d,dist,angle,T,col)
+      : state==='party'     ? aParty(d,dist,angle,T,col)
+      : state==='sleep'     ? aSleep(d,dist,angle,T,col)
+      : state==='vision'    ? aVision(d,dist,angle,T,col)
+      : state==='wake'      ? aWake(d,dist,angle,T,col)
+      : aError(d,dist,angle,T,col);
+
     const alpha=Math.max(0,Math.min(1,res.alpha)), radius=Math.max(.2,res.radius)*baseR;
     let cr=res.cr!==undefined?res.cr:col.r, cg=res.cg!==undefined?res.cg:col.g, cb=res.cb!==undefined?res.cb:col.b;
     if(alpha<.01) continue;
-    
-    // Soft outer glow
+
     const g=ctx.createRadialGradient(px,py,0,px,py,radius*4);
     g.addColorStop(0,rgba({r:cr,g:cg,b:cb},alpha*.65));
     g.addColorStop(.45,rgba({r:cr,g:cg,b:cb},alpha*.12));
     g.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=g; ctx.beginPath(); ctx.arc(px,py,radius*4,0,Math.PI*2); ctx.fill();
-    
-    // Core dot
+
     ctx.fillStyle=rgba({r:cr,g:cg,b:cb},Math.min(1,alpha*2.4));
     ctx.beginPath(); ctx.arc(px,py,radius,0,Math.PI*2); ctx.fill();
   }
-  
-  // Connection lines (thinking state only)
+
+  // Neural connection lines — thinking only
   if(state==='thinking'){
     ctx.save();
     for(let i=0;i<dots.length-1;i+=3){
@@ -607,15 +877,55 @@ function drawGrid(state,T,amp){
     }
     ctx.restore();
   }
+
+  // Confetti streamers — party only
+  if(state==='party'){
+    ctx.save();
+    for(let i=0;i<22;i++){
+      const ph=i*2.4+T*(.8+i*.07);
+      const rx=cx+Math.cos(ph)*(gw*.38+Math.sin(T*2+i)*gw*.13);
+      const ry=cy+Math.sin(ph*1.3)*(gw*.38+Math.cos(T*1.7+i)*gw*.11);
+      const hue=i/22*Math.PI*2+T;
+      const r=((.5+.5*Math.sin(hue))*255)|0;
+      const g2=((.5+.5*Math.sin(hue+2.1))*255)|0;
+      const b=((.5+.5*Math.sin(hue+4.2))*255)|0;
+      ctx.fillStyle=`rgba(${r},${g2},${b},0.78)`;
+      ctx.save(); ctx.translate(rx,ry); ctx.rotate(T*2.2+i);
+      ctx.fillRect(-4,-1.5,8,3);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // Alarm flash overlay — alarm only
+  if(state==='alarm'){
+    const flashA=Math.pow(Math.max(0,Math.sin(T*7)),6)*.18;
+    if(flashA>0.01){
+      ctx.save();
+      ctx.fillStyle=`rgba(255,80,0,${flashA})`;
+      ctx.fillRect(0,0,W,H);
+      ctx.restore();
+    }
+  }
 }
 
 function updateAudio(state){
-  // Use delta-time based increment to sync with grid animation (use T directly instead of simPhase)
-  amp=(state==='listening'||state==='speaking')
+  const lively=['listening','speaking','music','alarm','party'];
+  amp=lively.includes(state)
     ?Math.max(0,.2+.8*Math.pow(Math.sin(T*2.5),2)*Math.abs(Math.sin(T*4.5)))
     :amp*.88;
   document.querySelectorAll('.ab').forEach((b,i)=>{
-    b.style.height=((state==='listening'||state==='speaking')?Math.max(3,15*Math.abs(Math.sin(T*3.5+i*.5))):3)+'px';
+    let h=3;
+    if(state==='listening'||state==='speaking') h=Math.max(3,15*Math.abs(Math.sin(T*3.5+i*.5)));
+    else if(state==='music')  h=Math.max(3,16*Math.abs(Math.sin(T*6.5+i*.8)));
+    else if(state==='alarm')  h=Math.max(3,14*Math.pow(Math.max(0,Math.sin(T*7+i*.3)),2));
+    else if(state==='party')  h=Math.max(3,14*Math.abs(Math.sin(T*4+i*.6)));
+    b.style.height=h+'px';
+    // Colour bars to match state
+    const bc=state==='music'?'#E91E8C':state==='alarm'?'#F97316':state==='party'?'#EDA800'
+            :state==='error'?'#DC2626':state==='thinking'?'#7C3AED':state==='speaking'?'#059669'
+            :state==='listening'?'#0284C7':'#DDE3F0';
+    b.style.background=bc;
   });
 }
 
@@ -743,8 +1053,18 @@ function clearSpeechWatchdog() {
 }
 
 async function send(msg){
-  if(!msg.trim()||busy) return;
+  msg = (msg||'').trim();
+  if(!msg) return;
   busy=true; addMsg('user',msg); setState('thinking');
+
+  // ── Auto-detect entertaining states from command keywords ──────────────
+  const lo = msg.toLowerCase();
+  if(/\balarm\b|\bwake me\b|\btimer\b/.test(lo))           setTimeout(()=>setState('alarm'),   200);
+  else if(/\bsleep\b|\bgoodnight\b|\bnight\b/.test(lo))   setTimeout(()=>setState('sleep'),   200);
+  else if(/\bparty\b|\bcelebrat\b/.test(lo))              setTimeout(()=>setState('party'),   200);
+  else if(/\bvision\b|\bscan\b|\bcamera\b|\bscreen\b/.test(lo)) setTimeout(()=>setState('vision'), 200);
+  else if(/\bplay\b|\bmusic\b|\bsong\b/.test(lo))        setTimeout(()=>setState('music'),   200);
+  // ── End keyword detection ──────────────────────────────────────────────
   const sb=document.getElementById('sb'); sb.classList.add('loading');
   const loadEl=addMsg('jarvis','...','loading');
   try{
@@ -752,22 +1072,66 @@ async function send(msg){
     const data=await res.json();
     const reply=sanitizeReply(data.reply||data.error||'No response.');
     loadEl.remove();
-    setState('thinking');
     addMsg('jarvis',reply);
     if (typeof data.wake_active === 'boolean') setWakeWordUi(data.wake_active);
-    pollTTS();
+
+    // Flash entertaining state based on reply content
+    const rl = reply.toLowerCase();
+    if(/alarm set|reminder set|timer set/.test(rl)){
+      setState('alarm'); setTimeout(()=>setState('speaking'),1800); setTimeout(pollTTS,200);
+    } else if(/good night|sleep well|going to sleep/.test(rl)){
+      setState('sleep'); setTimeout(()=>setState('idle'),4000);
+    } else if(/playing|now playing|music|started/.test(rl)){
+      setState('music'); setTimeout(()=>setState('idle'),5000);
+    } else if(/done|complete|turned on|turned off|set to|confirmed|saved|success/.test(rl)){
+      setState('success'); setTimeout(()=>{setState('speaking'); pollTTS();},600);
+      setTimeout(()=>{ if(tgtState==='success') setState('idle'); },3500);
+    } else {
+      setState('thinking');
+      pollTTS();
+    }
   }catch(e){
     loadEl.remove(); setState('speaking'); addMsg('jarvis',localFallback(msg));
     setTimeout(()=>{setState('idle');busy=false;},2000);
   } finally {
     sb.classList.remove('loading');
-    // Always ensure busy resets after a reasonable time (defensive)
     setTimeout(()=>{ if(busy) busy=false; }, 15000);
   }
 }
 
 document.getElementById('sb').addEventListener('click',()=>{ const i=document.getElementById('inp'); send(i.value); i.value=''; });
 document.getElementById('inp').addEventListener('keydown',e=>{ if(e.key==='Enter'){send(e.target.value);e.target.value='';} });
+
+// Quick-action grid — tap a tile to fire its command
+document.querySelectorAll('.qa-btn[data-qa]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const cmd = btn.dataset.qa;
+    if (!cmd) return;
+    // Brief visual feedback: pop the icon
+    const icon = btn.querySelector('.qa-icon');
+    if (icon) {
+      icon.style.transform = 'scale(1.5) rotate(-10deg)';
+      icon.style.transition = 'transform 0.18s cubic-bezier(0.34,1.8,0.64,1)';
+      setTimeout(() => { icon.style.transform = ''; }, 280);
+    }
+    send(cmd);
+    // Switch to chat tab so the user sees the response
+    const chatTab = document.querySelector('.tab[data-v="chat"]');
+    if (chatTab && !chatTab.classList.contains('active')) {
+      chatTab.click();
+    }
+  });
+});
+
+// Collapsible quick-actions toggle
+const qaToggle = document.getElementById('qa-toggle-row');
+const qaActions = document.getElementById('qa-actions');
+if (qaToggle && qaActions) {
+  qaToggle.addEventListener('click', () => {
+    const isOpen = qaToggle.classList.toggle('open');
+    qaActions.classList.toggle('collapsed', !isOpen);
+  });
+}
 
 // MIC — Interrupt & Listen
 document.getElementById('mb').addEventListener('click',async()=>{
@@ -941,10 +1305,32 @@ function _connectSSE() {
   const es = new EventSource(`${API}/api/events`);
   es.addEventListener('tts_start', () => { setState('speaking'); busy = true; armSpeechWatchdog(6000); });
   es.addEventListener('tts_done',  () => { clearSpeechWatchdog(); setState('idle'); busy = false; });
-  es.addEventListener('wake',      d  => { try { const p = JSON.parse(d.data); if (p.state === 'listening') { setState('listening'); busy = true; } } catch{} });
-  es.addEventListener('stt',       d  => { try { const p = JSON.parse(d.data); if (p.text) addMsg('user', p.text); } catch{} });
-  es.addEventListener('reply',     d  => { try { const p = JSON.parse(d.data); if (p.text) { addMsg('jarvis', sanitizeReply(p.text)); setState('thinking'); pollTTS(); } } catch{} });
-  es.addEventListener('wake_state',d  => { try { const p = JSON.parse(d.data); setWakeWordUi(!!p.active); } catch{} });
+  es.addEventListener('wake', d => {
+    try {
+      const p = JSON.parse(d.data);
+      if (p.state === 'listening') {
+        setState('wake');                                    // cyan ripple burst
+        setTimeout(() => setState('listening'), 1200);      // then go blue
+        busy = true;
+      }
+    } catch{}
+  });
+  es.addEventListener('stt', d => { try { const p = JSON.parse(d.data); if (p.text) addMsg('user', p.text); } catch{} });
+  es.addEventListener('reply', d => {
+    try {
+      const p = JSON.parse(d.data);
+      if (!p.text) return;
+      const text = sanitizeReply(p.text);
+      addMsg('jarvis', text);
+      const rl = text.toLowerCase();
+      if(/alarm set|reminder set|timer set/.test(rl))       { setState('alarm');   setTimeout(()=>setState('idle'),2200); }
+      else if(/good night|sleep well|going to sleep/.test(rl)) { setState('sleep'); setTimeout(()=>setState('idle'),4000); }
+      else if(/playing|now playing|music started/.test(rl)) { setState('music');   setTimeout(()=>setState('idle'),5000); }
+      else if(/done|complete|turned on|turned off|confirmed|saved|success/.test(rl)) { setState('success'); setTimeout(()=>{ setState('speaking'); pollTTS(); },600); setTimeout(()=>{ if(tgtState==='success') setState('idle'); },3500); }
+      else { setState('thinking'); pollTTS(); }
+    } catch{}
+  });
+  es.addEventListener('wake_state', d => { try { const p = JSON.parse(d.data); setWakeWordUi(!!p.active); } catch{} });
   es.onerror = () => {
     es.close();
     setTimeout(_connectSSE, _sseRetryDelay);
@@ -1216,8 +1602,11 @@ document.getElementById('music-btn').addEventListener('click', async () => {
   const query = (input ? input.value.trim() : '') || prompt('What would you like to listen to?');
   if (!query) return;
   if (input) input.value = '';
+  setState('music');  // grid goes pink ripple-rings
   await fetch(`${API}/api/music`, {method:'POST', body:JSON.stringify({query}), headers:{'Content-Type':'application/json'}}).catch(()=>{});
-  setState('speaking'); setTimeout(pollTTS, 1200);
+  setTimeout(pollTTS, 1200);
+  // After TTS done, go back to idle (music keeps playing in background)
+  setTimeout(() => { if(tgtState==='music') setState('idle'); }, 8000);
 });
 
 

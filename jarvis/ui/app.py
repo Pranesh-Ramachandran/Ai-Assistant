@@ -2,13 +2,17 @@
 JARVIS Flask Web UI — secure, async-capable, rate-limited.
 """
 
-import hashlib
 import json
 import logging
 import os
+import platform
 import secrets
+import stat
+from functools import wraps
 from pathlib import Path
 from typing import Optional
+
+import bcrypt
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from flask_limiter import Limiter
@@ -20,14 +24,25 @@ _UI_DIR = str(Path(__file__).resolve().parent / "static")
 _USERS_FILE = str(Path(__file__).resolve().parent.parent.parent / "data" / "users.json")
 
 app = Flask(__name__, static_folder=_UI_DIR, static_url_path="", template_folder=_UI_DIR)
-app.secret_key = os.environ["FLASK_SECRET_KEY"]
+# Use env var if provided; auto-generate a secure key as fallback (not persisted across restarts)
+_secret = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+app.secret_key = _secret
+if not os.environ.get("FLASK_SECRET_KEY"):
+    logger.warning("FLASK_SECRET_KEY not set — sessions won't persist across restarts")
+
+# ── Secure cookie settings ────────────────────────────────────────────────────
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Strict"
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("JARVIS_HTTPS", "false").lower() == "true"
 
 # ── Rate limiting ─────────────────────────────────────────────────────────────
+_RATE_LIMIT_DB = str(Path(__file__).resolve().parent.parent.parent / "data" / "rate_limit.db")
+
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
     default_limits=["200 per day", "60 per hour"],
-    storage_uri="memory://",
+    storage_uri=f"sqlite:///{_RATE_LIMIT_DB}",
 )
 
 # ── Thread-safe lazy brain init ──────────────────────────────────────────────
@@ -62,21 +77,20 @@ def _save_users(users: dict) -> None:
         os.makedirs(os.path.dirname(_USERS_FILE), exist_ok=True)
         with open(_USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(users, f, indent=2)
+        if platform.system() != "Windows":
+            os.chmod(_USERS_FILE, stat.S_IRUSR | stat.S_IWUSR)
     except OSError as e:
         logger.error("Could not save users file: %s", e)
 
 
 def _hash_password(password: str) -> str:
-    salt = secrets.token_hex(16)
-    h = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
-    return f"{salt}:{h}"
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def _verify_password(password: str, stored: str) -> bool:
     try:
-        salt, h = stored.split(":", 1)
-        return secrets.compare_digest(h, hashlib.sha256(f"{salt}{password}".encode()).hexdigest())
-    except ValueError:
+        return bcrypt.checkpw(password.encode("utf-8"), stored.encode("utf-8"))
+    except Exception:
         return False
 
 
@@ -148,6 +162,9 @@ def authenticate():
 @app.route("/send_message", methods=["POST"])
 @limiter.limit("30 per minute")
 def send_message():
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Authentication required"}), 401
+
     data = request.get_json(silent=True)
     message = ((data or {}).get("message") or "").strip()
 
@@ -170,8 +187,13 @@ def logout():
 
 @app.route("/status")
 def status():
+    if "user" not in session:
+        return jsonify({"status": "ok", "authenticated": False}), 200
     from jarvis.core.ai_brain import get_status
-    return jsonify(get_status())
+    data = get_status()
+    data["version"] = "3.1.0"
+    data["authenticated"] = True
+    return jsonify(data)
 
 
 @app.route("/health")
@@ -196,8 +218,13 @@ def voice_login():
 
     audio_file = request.files.get("audio")
     if audio_file:
+        filename = audio_file.filename or ""
+        if not filename.lower().endswith(".pcm"):
+            return jsonify({"success": False, "message": "Only raw PCM audio (.pcm) accepted."}), 400
         import numpy as np
         raw = audio_file.read()
+        if len(raw) > 10 * 1024 * 1024:  # 10 MB max
+            return jsonify({"success": False, "message": "Audio file too large."}), 400
         audio_np = np.frombuffer(raw, dtype=np.float32)
         name, confidence = verify(audio_np, 16000)
     else:
@@ -256,3 +283,101 @@ def delete_voice_profile(name: str):
     if delete_profile(name):
         return jsonify({"success": True})
     return jsonify({"success": False, "message": "Profile not found."}), 404
+
+
+# ── Document Intelligence routes ───────────────────────────────────
+
+@app.route("/document_upload", methods=["POST"])
+@limiter.limit("10 per minute")
+def document_upload():
+    """Upload and process documents."""
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Authentication required"}), 401
+    
+    try:
+        from jarvis.services.document_intelligence import get_document_intelligence
+        doc_intel = get_document_intelligence()
+    except ImportError:
+        return jsonify({"success": False, "message": "Document intelligence not available"}), 500
+    
+    if "document" not in request.files:
+        return jsonify({"success": False, "message": "No document file provided"}), 400
+    
+    file = request.files["document"]
+    if not file.filename:
+        return jsonify({"success": False, "message": "No file selected"}), 400
+    
+    # Validate file size (10MB max)
+    file.seek(0, 2)
+    size = file.tell()
+    file.seek(0)
+    if size > 10 * 1024 * 1024:
+        return jsonify({"success": False, "message": "File too large (max 10MB)"}), 400
+    
+    import tempfile
+    import os
+    
+    # Save to temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
+        file.save(temp_file.name)
+        temp_path = temp_file.name
+    
+    try:
+        query = request.form.get("query", "").strip()
+        result = doc_intel.process_document(temp_path, query or None)
+        
+        return jsonify({
+            "success": True,
+            "result": result,
+            "filename": file.filename
+        })
+    
+    finally:
+        # Clean up temp file
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+
+
+@app.route("/document_analyze", methods=["POST"])
+@limiter.limit("10 per minute")
+def document_analyze():
+    """Analyze document structure and metadata."""
+    if "user" not in session:
+        return jsonify({"success": False, "message": "Authentication required"}), 401
+    
+    data = request.get_json(silent=True)
+    file_path = (data or {}).get("file_path", "").strip()
+    
+    if not file_path:
+        return jsonify({"success": False, "message": "File path required"}), 400
+    
+    try:
+        from jarvis.services.document_intelligence import get_document_intelligence
+        doc_intel = get_document_intelligence()
+        result = doc_intel.analyze_document_structure(file_path)
+        
+        return jsonify({
+            "success": True,
+            "analysis": result
+        })
+    
+    except ImportError:
+        return jsonify({"success": False, "message": "Document intelligence not available"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/document_formats", methods=["GET"])
+def document_formats():
+    """Get supported document formats."""
+    try:
+        from jarvis.services.document_intelligence import get_document_intelligence
+        doc_intel = get_document_intelligence()
+        return jsonify({
+            "success": True,
+            "formats": doc_intel.list_supported_formats()
+        })
+    except ImportError:
+        return jsonify({"success": False, "message": "Document intelligence not available"}), 500

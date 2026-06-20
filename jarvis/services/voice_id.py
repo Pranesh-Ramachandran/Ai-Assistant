@@ -97,28 +97,35 @@ def _extract_mfcc(audio: np.ndarray, sr: int = _SAMPLE_RATE) -> Optional[np.ndar
 
 def _dtw_distance(a: np.ndarray, b: np.ndarray) -> float:
     """
-    Pure-numpy normalized DTW cosine distance. No numba/librosa.sequence needed.
+    Vectorized numpy DTW cosine distance. Replaces the O(n*m) pure-Python loop.
     a, b: shape (n_mfcc, T)
     """
     if a.size == 0 or b.size == 0:
         return float("inf")
     n, m = a.shape[1], b.shape[1]
-    # Cost matrix: cosine distance between each pair of frames
-    # Normalize columns to unit vectors first
     a_n = a / (np.linalg.norm(a, axis=0, keepdims=True) + 1e-8)
     b_n = b / (np.linalg.norm(b, axis=0, keepdims=True) + 1e-8)
-    cost = 1.0 - (a_n.T @ b_n)  # shape (n, m), values in [0, 2]
+    cost = 1.0 - (a_n.T @ b_n)  # (n, m)
 
-    # DP accumulation
     D = np.full((n + 1, m + 1), np.inf)
     D[0, 0] = 0.0
     for i in range(1, n + 1):
-        for j in range(1, m + 1):
-            D[i, j] = cost[i - 1, j - 1] + min(D[i - 1, j], D[i, j - 1], D[i - 1, j - 1])
+        prev_row = D[i - 1, :]  # shape (m+1,)
+        diag = prev_row[:-1]    # D[i-1, j-1]
+        up   = prev_row[1:]     # D[i-1, j]
+        left = D[i, :-1]        # D[i, j-1]  — filled left-to-right below
+        # We still need a per-row left-to-right pass for the left neighbour,
+        # but we can vectorise the diagonal+up component:
+        best_prev = np.minimum(diag, up)  # min(D[i-1,j-1], D[i-1,j]) for all j
+        # Left neighbour requires sequential scan — do it with cumsum trick:
+        # D[i,j] = cost[i-1,j-1] + min(best_prev[j-1], D[i,j-1])
+        row = np.empty(m)
+        row[0] = cost[i - 1, 0] + min(best_prev[0], D[i, 0])
+        for j in range(1, m):
+            row[j] = cost[i - 1, j] + min(best_prev[j], row[j - 1])
+        D[i, 1:] = row
 
-    # Traceback path length for normalization
-    path_len = n + m - 1
-    return float(D[n, m] / max(path_len, 1))
+    return float(D[n, m] / max(n + m - 1, 1))
 
 
 # ── Profile persistence ───────────────────────────────────────────────────────

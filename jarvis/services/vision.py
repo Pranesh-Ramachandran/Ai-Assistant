@@ -280,40 +280,81 @@ def scan_qr_from_screen() -> str:
 # ── Gemini Vision ─────────────────────────────────────────────────────────────
 
 def _describe_with_gemini(image_bytes: bytes, prompt: str = "Describe what you see in this image concisely.") -> Optional[str]:
-    """Send image to Gemini Vision for description."""
+    """Send image to Gemini Vision for description. ONLY for explicit vision analysis."""
+    
+    # Check if Gemini should be used conservatively
+    vision_only = os.getenv("GEMINI_VISION_ONLY", "false").lower() == "true"
+    if vision_only:
+        # Only use for explicit analysis requests
+        analysis_keywords = ["analyze", "detailed", "describe", "what is", "identify"]
+        if not any(keyword in prompt.lower() for keyword in analysis_keywords):
+            logger.info("Skipping Gemini call - not an analysis request")
+            return None
+    
+    # Rate limiting check
     try:
-        # Lazy import to avoid circular dependency
+        from jarvis.core.rate_guard import can_call
+        allowed, reason = can_call("gemini")
+        if not allowed:
+            logger.warning(f"Gemini vision blocked: {reason}")
+            return None
+    except ImportError:
+        pass
+    
+    # Cooldown check
+    cooldown = int(os.getenv("GEMINI_VISION_COOLDOWN", "10"))
+    global _last_gemini_call
+    if not hasattr(_describe_with_gemini, '_last_call'):
+        _describe_with_gemini._last_call = 0
+    
+    import time
+    now = time.time()
+    if now - _describe_with_gemini._last_call < cooldown:
+        logger.info(f"Gemini vision cooldown: {cooldown}s")
+        return None
+    
+    try:
+        # Try using existing AI brain first (may use Groq instead)
         from jarvis.core.ai_brain import ask as ai_ask
         
-        # Try using existing AI brain first
+        # Only use direct Gemini for image analysis
         b64 = base64.b64encode(image_bytes).decode()
-        ai_prompt = f"{prompt} [Image data: {len(image_bytes)} bytes]"
-        response = ai_ask(ai_prompt)
-        if response and not any(greeting in response.lower() for greeting in ["hello", "what do you need", "i'm jarvis"]):
-            return response
+        if len(b64) > 1000:  # Only for actual images
+            _describe_with_gemini._last_call = now
             
     except ImportError:
         pass
     
-    # Direct Gemini API fallback
+    # Direct Gemini API (last resort)
     try:
         import google.genai as genai
         key = os.getenv("GEMINI_API_KEY", "")
         if not key:
             return None
             
+        _describe_with_gemini._last_call = now
         client = genai.Client(api_key=key)
         b64 = base64.b64encode(image_bytes).decode()
+        
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-1.5-flash",  # Use cheaper model
             contents=[
                 {"role": "user", "parts": [
                     {"inline_data": {"mime_type": "image/jpeg", "data": b64}},
-                    {"text": prompt}
+                    {"text": prompt + " (Be concise - 1-2 sentences)"}
                 ]}
             ]
         )
+        
+        # Record the API call
+        try:
+            from jarvis.core.rate_guard import record_call
+            record_call("gemini")
+        except ImportError:
+            pass
+            
         return response.text.strip() if response.text else None
+        
     except Exception as e:
         logger.warning(f"Gemini Vision error: {e}")
         return None

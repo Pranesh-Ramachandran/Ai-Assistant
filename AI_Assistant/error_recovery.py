@@ -136,6 +136,13 @@ class ErrorRecoveryManager:
     
     def should_retry(self, error: Exception, attempt: int) -> bool:
         """Decide if operation should be retried."""
+        error_text = str(error).lower()
+        # Retrying quota/rate-limit failures is the fastest way to turn one
+        # user request into several billed attempts. Let provider fallback run.
+        if any(token in error_text for token in
+               ("quota_guard", "rate_limit", "rate limit", "429", "resource_exhausted")):
+            print("[ErrorRecovery] Quota/rate limit error, not retrying")
+            return False
         error_type = self.categorize_error(error)
         
         if attempt >= self.retry_config["max_retries"]:

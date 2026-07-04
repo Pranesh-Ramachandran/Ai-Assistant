@@ -65,6 +65,60 @@ Once running, verify these components in the UI (`http://localhost:7890`):
 - **Wake Word**: Open the hamburger menu and toggle the Wake Word to ON. Say "Aria" (default wake word) followed by a command.
 - **Dark Mode**: Toggle Dark Mode in the menu to test the UI responsive design.
 
+## Voice Login (Option 2)
+
+JARVIS supports voice-based authentication for convenient secure access.
+
+- **Voice ID**: Use a registered voice profile (example wake phrase: "Hey Jarvis").
+- **Recognition Example:**
+
+   "Hey Jarvis"
+
+   Voice recognized:
+
+   Pranesh
+   97%
+
+   Authenticated.
+
+- **Usage:** Voice Login may be used for routine authorization flows where voice biometrics are acceptable.
+- **High-security actions:** For critical operations, only use the approved processes: Voice Login (Option 2) or Voice + Face (Option 3 — future enhancement). Do not bypass these methods for high-security authorization and authentication.
+
+### Enrolling a Voice Profile
+
+To enroll a voice profile for use with Voice Login, capture a clean WAV sample (16 kHz recommended) and run the enrollment helper:
+
+```cmd
+python -m AI_Assistant.voice_auth enroll Pranesh samples/pranesh_01.wav
+```
+
+The example stores a single embedding; for production, enroll several samples and store secure, encrypted embeddings.
+
+### Encrypted profiles & liveness
+
+- Enrollments and face/voice profiles are stored encrypted on disk by default (`AI_Assistant/.jarvis_key` and `AI_Assistant/voice_profiles.enc`).
+- Basic liveness/anti-replay heuristics run during enroll/verify to reduce replay attacks. These checks are a scaffold and not a replacement for production anti-spoofing.
+
+### Enrolling a face (2FA scaffold)
+
+Capture a clear face image (frontal) and enroll:
+
+```cmd
+python -m AI_Assistant.face_auth enroll Pranesh samples/pranesh_face.jpg
+```
+
+To verify a face:
+
+```cmd
+python -m AI_Assistant.face_auth verify samples/verify_face.jpg
+```
+
+When both voice and face are required for a high-security action, run `voice_auth.verify_voice` and `face_auth.verify_face` and require both to pass.
+
+## Option 3: Voice + Face (Future enhancement)
+
+Planned for multi-factor biometric authentication for high-security actions. Combines voice biometrics with face recognition for stronger assurance.
+
 ## 5. Troubleshooting
 
 - **No audio output**: Ensure `JARVIS_TTS_MODE=hq` in your `.env` and that `edge-tts` is installed. Check system volume.

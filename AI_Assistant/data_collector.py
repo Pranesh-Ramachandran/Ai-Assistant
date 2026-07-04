@@ -71,25 +71,42 @@ def get_weather(query: str) -> str:
         if resp.status_code == 200:
             text = resp.text.strip()
             # wttr.in format=4 → "City: ⛅ +24°C ↗14km/h 65%"
-            # Replace weather symbols with readable text
-            text = text.replace("⛅", "partly cloudy")
-            text = text.replace("☀️", "sunny")
-            text = text.replace("🌤️", "mostly sunny")
-            text = text.replace("⛈️", "thunderstorm")
-            text = text.replace("🌧️", "rainy")
-            text = text.replace("❄️", "snowy")
-            text = text.replace("↗", "wind direction NE")
-            text = text.replace("↘", "wind direction SE")
-            text = text.replace("↙", "wind direction SW")
-            text = text.replace("↖", "wind direction NW")
-            text = text.replace("°", " degrees")
-            # Remove any remaining non-ASCII characters that aren't critical
-            text = ''.join(c if ord(c) < 128 or c in "°℃℉" else "" for c in text)
-            text = re.sub(r"\s{2,}", " ", text).strip()
-            if location:
-                result = f"Weather in {location}: {text}"
+            # Split on first colon to preserve city name, clean only the weather part
+            if ":" in text:
+                city_part, weather_part = text.split(":", 1)
             else:
-                result = f"Current weather: {text}"
+                city_part, weather_part = "", text
+
+            # Replace weather emoji with readable text
+            for emoji, word in [
+                ("⛅", "partly cloudy"), ("☀️", "sunny"), ("🌤️", "mostly sunny"),
+                ("⛈️", "thunderstorm"), ("🌧️", "rainy"), ("❄️", "snowy"),
+                ("🌩️", "thunderstorm"), ("🌨️", "snowy"), ("🌦️", "light rain"),
+                ("🌫️", "foggy"), ("🌬️", "windy"),
+            ]:
+                weather_part = weather_part.replace(emoji, word)
+
+            # Replace directional arrows with wind direction words
+            for arrow, direction in [
+                ("↗", "NE"), ("→", "E"), ("↘", "SE"), ("↓", "S"),
+                ("↙", "SW"), ("←", "W"), ("↖", "NW"), ("↑", "N"),
+            ]:
+                weather_part = weather_part.replace(arrow, f"wind {direction}")
+
+            weather_part = weather_part.replace("°C", " degrees Celsius")
+            weather_part = weather_part.replace("°F", " degrees Fahrenheit")
+            weather_part = weather_part.replace("°", " degrees")
+            weather_part = re.sub(r"(\d+)\s*km/h", r"\1 kilometers per hour", weather_part)
+            weather_part = weather_part.replace("km/h", "kilometers per hour")
+            weather_part = re.sub(r"(\d+)\s*mph", r"\1 miles per hour", weather_part)
+            weather_part = weather_part.replace("%", " percent")
+
+            # Strip remaining non-ASCII from weather part only
+            weather_part = ''.join(c if ord(c) < 128 else " " for c in weather_part)
+            weather_part = re.sub(r"\s{2,}", " ", weather_part).strip()
+
+            display_city = location or city_part.strip() or "your area"
+            result = f"Weather in {display_city}: {weather_part}"
             _cache_set(cache_key, result)
             return result
     except requests.Timeout:

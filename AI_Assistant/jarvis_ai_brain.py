@@ -172,7 +172,7 @@ except Exception as e:
     def _inject_tamil(t): return t
 
 from jarvis_cache      import get as cache_get, put as cache_put
-from jarvis_rate_guard import can_call, record_call, get_mode, status_report
+from jarvis_rate_guard import acquire_call, can_call, get_mode, status_report
 from data_collector    import get_weather, get_information, get_news
 
 # ─── Tier 1: Extended Memory & Intent Classification ──────────────────────────
@@ -1017,6 +1017,31 @@ def _safe_math_eval(expr: str):
 
 def _try_rule(text: str) -> Optional[str]:
     t = text.lower().strip()
+
+    # Reliable local commands should never depend on LLM quota or conversation
+    # follow-up inference.
+    if re.search(r"\b(joke|make me laugh|something funny)\b", t):
+        if _ENTERTAIN_OK:
+            return _entertainment.get_random_joke()
+        return "Why did the computer take a break? It needed to clear its cache."
+
+    if re.search(r"\b(cpu|processor)\b", t) and re.search(r"\b(ram|memory)\b", t):
+        if _SYS_ACCESS:
+            return f"{_sys_exec('get_cpu_usage', {})}. {_sys_exec('get_ram_usage', {})}."
+
+    if re.search(r"\b(calendar|schedule|events?|appointments?)\b", t) and re.search(
+        r"\b(today|week|next|upcoming|calendar|schedule|events?|appointments?)\b", t
+    ):
+        period = "week" if "week" in t or "upcoming" in t else "next" if "next" in t else "today"
+        return _execute_tool("get_calendar", {"period": period})
+
+    if re.search(r"\b(turn|switch)\b.*\b(light|lamp|bulb|fan|plug|tv|ac)\b", t):
+        if _SMARTHOME_OK:
+            return _smarthome_control(text)
+
+    if re.search(r"\b(weather|temperature|forecast)\b", t) and _DATA_OK:
+        return get_weather(text)
+
     for triggers, handler in _SIMPLE_RULES.items():
         for kw in triggers:
             # Match whole words at start of sentence OR as complete words, not substrings
@@ -1043,6 +1068,14 @@ def _try_rule(text: str) -> Optional[str]:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _groq_client = None
+
+
+def _guarded_api_call(provider: str, call):
+    """Reserve quota immediately before each real network attempt."""
+    allowed, reason = acquire_call(provider)
+    if not allowed:
+        raise RuntimeError(f"quota_guard: {provider} skipped: {reason}")
+    return call()
 
 def _get_groq():
     global _groq_client
@@ -1073,7 +1106,7 @@ def _call_groq(messages: list[dict], strict: bool = False) -> Optional[str]:
     try:
         # First call — may include tool use (wrapped with error recovery)
         def _groq_call_1():
-            return client.chat.completions.create(
+            return _guarded_api_call("groq", lambda: client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=msgs,
                 tools=_TOOLS_GROQ,
@@ -1082,13 +1115,11 @@ def _call_groq(messages: list[dict], strict: bool = False) -> Optional[str]:
                 temperature=0.7,
                 parallel_tool_calls=False,
                 timeout=10,
-            )
+            ))
         
         response = ERROR_RECOVERY.retry_with_backoff(_groq_call_1, "groq", args=())
         if response is None:
             return None
-        record_call("groq")
-
         msg = response.choices[0].message
 
         # Handle structured tool calls
@@ -1110,18 +1141,17 @@ def _call_groq(messages: list[dict], strict: bool = False) -> Optional[str]:
             msgs2 = msgs + [msg] + tool_results  # type: ignore[list-item]
             
             def _groq_call_2():
-                return client.chat.completions.create(
+                return _guarded_api_call("groq", lambda: client.chat.completions.create(
                     model="llama-3.1-8b-instant",
                     messages=msgs2,
                     max_tokens=max_tokens,
                     temperature=0.7,
                     timeout=10,
-                )
+                ))
             
             response2 = ERROR_RECOVERY.retry_with_backoff(_groq_call_2, "groq", args=())
             if response2 is None:
                 return None
-            record_call("groq")
             return _clean_response(response2.choices[0].message.content or "")
 
         # Fallback: check if response has raw JSON tool call text
@@ -1137,14 +1167,13 @@ def _call_groq(messages: list[dict], strict: bool = False) -> Optional[str]:
                         {"role": "assistant", "content": response_text},
                         {"role": "tool", "tool_call_id": "fallback", "content": result}
                     ]
-                    response3 = client.chat.completions.create(
+                    response3 = _guarded_api_call("groq", lambda: client.chat.completions.create(
                         model="llama-3.1-8b-instant",
                         messages=synthesis_msgs,
                         max_tokens=max_tokens,
                         temperature=0.7,
                         timeout=10,
-                    )
-                    record_call("groq")
+                    ))
                     return _clean_response(response3.choices[0].message.content or "")
             except (json.JSONDecodeError, ValueError):
                 pass
@@ -1162,14 +1191,13 @@ def _call_groq(messages: list[dict], strict: bool = False) -> Optional[str]:
                         {"role": "assistant", "content": response_text},
                         {"role": "tool", "tool_call_id": "fallback", "content": result}
                     ]
-                    response3 = client.chat.completions.create(
+                    response3 = _guarded_api_call("groq", lambda: client.chat.completions.create(
                         model="llama-3.1-8b-instant",
                         messages=synthesis_msgs,
                         max_tokens=max_tokens,
                         temperature=0.7,
                         timeout=10,
-                    )
-                    record_call("groq")
+                    ))
                     return _clean_response(response3.choices[0].message.content or "")
             except (json.JSONDecodeError, ValueError, AttributeError):
                 pass
@@ -1187,14 +1215,13 @@ def _call_groq(messages: list[dict], strict: bool = False) -> Optional[str]:
                         {"role": "assistant", "content": response_text},
                         {"role": "tool", "tool_call_id": "fallback", "content": result}
                     ]
-                    response3 = client.chat.completions.create(
+                    response3 = _guarded_api_call("groq", lambda: client.chat.completions.create(
                         model="llama-3.1-8b-instant",
                         messages=synthesis_msgs,
                         max_tokens=max_tokens,
                         temperature=0.7,
                         timeout=10,
-                    )
-                    record_call("groq")
+                    ))
                     return _clean_response(response3.choices[0].message.content or "")
             except (json.JSONDecodeError, ValueError, AttributeError):
                 pass
@@ -1209,13 +1236,12 @@ def _call_groq(messages: list[dict], strict: bool = False) -> Optional[str]:
         # Retry once without tools so Groq answers directly.
         if "tool_use_failed" in err or "Failed to call a function" in err:
             try:
-                r2 = client.chat.completions.create(
+                r2 = _guarded_api_call("groq", lambda: client.chat.completions.create(
                     model="llama-3.1-8b-instant",
                     messages=msgs,
                     max_tokens=max_tokens,
                     temperature=0.7,
-                )
-                record_call("groq")
+                ))
                 return _clean_response(r2.choices[0].message.content or "")
             except Exception as exc2:
                 print(f"[Groq retry error] {exc2}")
@@ -1258,7 +1284,7 @@ def _call_gemini(history: list[dict], user_text: str, strict: bool = False) -> O
 
     try:
         def _gemini_call():
-            return client.models.generate_content(
+            return _guarded_api_call("gemini", lambda: client.models.generate_content(
                 model="gemini-2.0-flash",
                 contents=contents,
                 config=_genai.types.GenerateContentConfig(
@@ -1266,12 +1292,11 @@ def _call_gemini(history: list[dict], user_text: str, strict: bool = False) -> O
                     max_output_tokens=120 if strict else 400,
                     temperature=0.7,
                 )
-            )
+            ))
         
         response = ERROR_RECOVERY.retry_with_backoff(_gemini_call, "gemini", args=())
         if response is None:
             return None
-        record_call("gemini")
         return _clean_response(response.text or "")
 
     except Exception as exc:
@@ -1501,7 +1526,11 @@ def ask(user_input: str, personality: str = "default") -> str:
             print(f"[Query rephrasing error] {e}")
     
     # Time-aware execution
-    if _TIME_AWARE_OK:
+    scheduling_request = bool(re.search(
+        r"\b(remind|reminder|alarm|schedule|book|create|add|set|notify|alert)\b", text,
+        re.IGNORECASE,
+    ))
+    if _TIME_AWARE_OK and scheduling_request:
         try:
             time_info = extract_scheduled_action(text)
             if time_info.get("is_timed"):
@@ -1622,15 +1651,14 @@ def ask(user_input: str, personality: str = "default") -> str:
                 msgs_retry = messages + [
                     {"role": "user", "content": f"Please answer directly and confidently: {text}"}
                 ]
-                response2 = _groq_client.chat.completions.create(
+                response2 = _guarded_api_call("groq", lambda: _groq_client.chat.completions.create(
                     model="llama-3.1-8b-instant",
                     messages=msgs_retry,
                     tools=[],  # No tools — just answer
                     max_tokens=200,
                     temperature=0.7,
                     timeout=10,
-                )
-                record_call("groq")
+                ))
                 response = _clean_response(response2.choices[0].message.content or "")
                 print(f"[Novel query retry] Got: {response[:50]}...")
             except Exception as e:

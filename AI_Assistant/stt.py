@@ -45,6 +45,7 @@ except ImportError:
 
 _RECOGNIZER = sr.Recognizer()
 _RECOGNIZER.pause_threshold            = 0.3      # Shorter pause = faster detection (reduced from 0.4)
+_RECOGNIZER.non_speaking_duration      = 0.2      # Must not exceed pause_threshold
 _RECOGNIZER.energy_threshold           = 1500     # Lower = more sensitive (reduced from 300 to match wake detector)
 _RECOGNIZER.dynamic_energy_threshold = True      # Auto-calibrate to environment
 _RECOGNIZER.phrase_threshold           = 0.3      # Minimum energy for valid phrase (reduced from 0.5)
@@ -63,14 +64,15 @@ def check_internet() -> bool:
         return False
 
 
-def _clean(text: str) -> str:
+def _clean(text: str, strip_wake: bool = True) -> str:
     """Normalize recognized text."""
     t = text.lower().strip()
     t = re.sub(r"\s+", " ", t)
-    # strip wake word prefix if accidentally captured
-    for prefix in ("hey jarvis ", "ok jarvis ", "jarvis "):
-        if t.startswith(prefix):
-            t = t[len(prefix):]
+    if strip_wake:
+        # strip wake word prefix if accidentally captured
+        for prefix in ("hey jarvis ", "ok jarvis ", "jarvis "):
+            if t.startswith(prefix):
+                t = t[len(prefix):]
     return t.strip()
 
 
@@ -105,8 +107,8 @@ def _capture_sd(timeout: float = 8.0, phrase_limit: float = 7.0):
 
     voiced, silence, started = [], 0, False
     voice_start = 0.0
-    MAX_SILENCE = int(RATE / CHUNK * 1.0)   # 1s silence ends phrase
-    noise_buf: list = []
+    MAX_SILENCE = int(RATE / CHUNK * 1.5)   # 1.5s silence ends phrase (was 1s — too short for wake word)
+    MIN_VOICE_FRAMES = int(RATE / CHUNK * 0.2)  # ignore sub-200ms blips
     NOISE_FRAMES = int(RATE / CHUNK * 0.3)  # 300ms noise baseline
 
     try:
@@ -127,10 +129,7 @@ def _capture_sd(timeout: float = 8.0, phrase_limit: float = 7.0):
                     import numpy as np
                     frame = np.frombuffer(data, dtype=np.int16).astype(np.float32)
                     rms = float(np.sqrt(np.mean(frame ** 2))) if frame.size else 0.0
-                    if not started and len(noise_buf) < NOISE_FRAMES:
-                        noise_buf.append(rms)
-                    noise_floor = float(sum(noise_buf) / max(1, len(noise_buf)))
-                    is_speech = rms > max(200.0, noise_floor * 2.5)
+                    is_speech = rms > 300.0  # fixed low threshold
 
                 if is_speech:
                     if not started:
@@ -161,13 +160,36 @@ def _recognize_google(audio: sr.AudioData) -> str:
     lang = os.getenv("JARVIS_STT_LANG", "en").lower()
     google_lang = "ta-IN" if lang == "ta" else "en-IN"
     try:
-        text = _RECOGNIZER.recognize_google(audio, language=google_lang)
+        text = _recognize_google_https(audio, language=google_lang, show_all=False)
         return _clean(text)
     except sr.UnknownValueError:
         return ""
     except Exception as e:
         print(f"[STT] Google error: {e}")
         return ""
+
+
+def _recognize_google_https(audio: sr.AudioData, language: str, show_all: bool = False):
+    """Google Web Speech via HTTPS + requests instead of failing urllib path."""
+    import requests
+    from speech_recognition.recognizers.google import (
+        OutputParser,
+        create_request_builder,
+    )
+
+    builder = create_request_builder(
+        endpoint="https://www.google.com/speech-api/v2/recognize",
+        language=language,
+    )
+    request = builder.build(audio)
+    response = requests.post(
+        request.full_url,
+        data=request.data,
+        headers=dict(request.header_items()),
+        timeout=_RECOGNIZER.operation_timeout or 10,
+    )
+    response.raise_for_status()
+    return OutputParser(show_all=show_all, with_confidence=False).parse(response.text)
 
 
 def _recognize_vosk(raw: bytes, rate: int) -> str:
@@ -237,6 +259,35 @@ def listen(timeout: float = 8.0, phrase_limit: float = 7.0) -> str:
         print("[STT] Offline and no Vosk model — cannot recognize.")
 
     return ""
+
+
+def listen_candidates(timeout: float = 4.0, phrase_limit: float = 2.5) -> list[str]:
+    """Capture one phrase and return Google STT's ranked alternatives.
+
+    Wake-word detection benefits from alternatives because accented
+    "hey Jarvis" is sometimes ranked below a phrase such as "how are you".
+    """
+    if not _SD or not check_internet():
+        text = listen(timeout=timeout, phrase_limit=phrase_limit)
+        return [text] if text else []
+
+    raw, rate = _capture_sd(timeout=timeout, phrase_limit=phrase_limit)
+    if not raw:
+        return []
+    audio = sr.AudioData(raw, rate, 2)
+    candidates: list[str] = []
+    for language in ("en-IN", "en-US"):
+        try:
+            result = _recognize_google_https(audio, language=language, show_all=True)
+            alternatives = result.get("alternative", []) if isinstance(result, dict) else []
+            for alternative in alternatives:
+                # Don't strip wake word — wake detector needs the full phrase
+                cleaned = _clean(alternative.get("transcript", ""), strip_wake=False)
+                if cleaned and cleaned not in candidates:
+                    candidates.append(cleaned)
+        except (sr.UnknownValueError, sr.RequestError, OSError):
+            continue
+    return candidates
 
 
 # ── Status ────────────────────────────────────────────────────────────────────

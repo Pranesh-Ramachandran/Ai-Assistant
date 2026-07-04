@@ -17,11 +17,14 @@ Public API:
 from __future__ import annotations
 
 import asyncio
+from contextlib import nullcontext
 import hashlib
 import io
 import logging
 import os
 import queue
+import shutil
+import subprocess
 import threading
 import time
 from typing import Optional
@@ -215,6 +218,9 @@ def _get_sapi_worker() -> Optional[_PyTTSWorker]:
 
 _PYGAME_READY = False
 _PYGAME_LOCK = threading.Lock()
+_FFPLAY_PATH = shutil.which("ffplay")
+_FFPLAY_PROCESS = None
+_FFPLAY_LOCK = threading.Lock()
 
 
 def _azure_enabled() -> bool:
@@ -237,8 +243,9 @@ def _ensure_pygame() -> bool:
         if _PYGAME_READY:
             return True
         try:
-            # frequency=22050, buffer=512 minimises latency
-            _pygame.mixer.pre_init(22050, -16, 1, 512)
+            # Edge-TTS emits 24 kHz audio. Matching it avoids SDL resampling
+            # crackle; a 1024-sample buffer is still low-latency but steadier.
+            _pygame.mixer.pre_init(24000, -16, 1, 1024)
             _pygame.mixer.init()
             _PYGAME_READY = True
         except Exception as exc:
@@ -286,6 +293,129 @@ async def _stream_to_bytes(text: str, voice: str) -> bytes:
     return buf.read()
 
 
+def _ffplay_command() -> list[str]:
+    """Low-latency player command for Edge-TTS's 24 kHz mono MP3 stream."""
+    return [
+        _FFPLAY_PATH,
+        "-nodisp",
+        "-autoexit",
+        "-loglevel", "error",
+        "-f", "mp3",
+        "-i", "pipe:0",
+    ]
+
+
+def _start_ffplay():
+    if not _FFPLAY_PATH:
+        return None
+    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    return subprocess.Popen(
+        _ffplay_command(),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=creationflags,
+    )
+
+
+def _register_ffplay(process) -> None:
+    global _FFPLAY_PROCESS
+    with _FFPLAY_LOCK:
+        _FFPLAY_PROCESS = process
+
+
+def _unregister_ffplay(process) -> None:
+    global _FFPLAY_PROCESS
+    with _FFPLAY_LOCK:
+        if _FFPLAY_PROCESS is process:
+            _FFPLAY_PROCESS = None
+
+
+def _terminate_ffplay() -> None:
+    with _FFPLAY_LOCK:
+        process = _FFPLAY_PROCESS
+    if process and process.poll() is None:
+        try:
+            process.terminate()
+        except OSError:
+            pass
+
+
+def _play_mp3_ffplay(audio_bytes: bytes) -> bool:
+    """Play a cached MP3 through ffplay without a temporary file."""
+    process = _start_ffplay()
+    if not process:
+        return False
+    _register_ffplay(process)
+    started = False
+    try:
+        _notify_playback_start()
+        started = True
+        process.communicate(input=audio_bytes)
+        return process.returncode == 0 and not _stop_flag.is_set()
+    except (BrokenPipeError, OSError):
+        return False
+    finally:
+        if started:
+            _notify_playback_end()
+        _unregister_ffplay(process)
+
+
+async def _stream_edge_to_ffplay(text: str, voice: str) -> tuple[bool, bytes]:
+    """Feed Edge-TTS chunks to ffplay as they arrive and retain cache bytes."""
+    process = _start_ffplay()
+    if not process:
+        return False, b""
+
+    _register_ffplay(process)
+    audio = bytearray()
+    pending = bytearray()
+    prebuffer_bytes = max(0, int(os.getenv("JARVIS_TTS_PREBUFFER_BYTES", "12000")))
+    started = False
+    try:
+        communicator = _edge_tts.Communicate(text, voice)
+        async for chunk in communicator.stream():
+            if _stop_flag.is_set():
+                break
+            if chunk["type"] != "audio":
+                continue
+            data = chunk["data"]
+            audio.extend(data)
+            pending.extend(data)
+            if process.poll() is not None or process.stdin is None:
+                break
+            if not started and len(pending) < prebuffer_bytes:
+                continue
+            process.stdin.write(pending)
+            process.stdin.flush()
+            pending.clear()
+            if not started:
+                _notify_playback_start()
+                started = True
+
+        # Short replies may finish synthesis before reaching the threshold.
+        if pending and not _stop_flag.is_set() and process.stdin and process.poll() is None:
+            process.stdin.write(pending)
+            process.stdin.flush()
+            if not started:
+                _notify_playback_start()
+                started = True
+        if process.stdin and not process.stdin.closed:
+            process.stdin.close()
+        process.wait()
+        played = process.returncode == 0 and started and not _stop_flag.is_set()
+        return played, bytes(audio)
+    except (BrokenPipeError, OSError) as exc:
+        LOGGER.debug("ffplay streaming failed: %s", exc)
+        return False, bytes(audio)
+    finally:
+        if process.poll() is None:
+            process.terminate()
+        if started:
+            _notify_playback_end()
+        _unregister_ffplay(process)
+
+
 # ── pydub + sounddevice for stutter-free PCM playback ────────────────────
 try:
     from pydub import AudioSegment as _AudioSegment
@@ -330,14 +460,15 @@ def _notify_playback_end():
             pass
 
 
-def _play_mp3_bytes(audio_bytes: bytes) -> bool:
+def _play_mp3_bytes(audio_bytes: bytes, acquire_lock: bool = True) -> bool:
     """Decode MP3 → PCM → play via sounddevice. Falls back to pygame, then temp-file.
     Returns True if audio was played, False if all methods failed."""
     _stop_flag.clear()
 
     if _PCM_PLAY:
         try:
-            with _play_lock:
+            lock = _play_lock if acquire_lock else nullcontext()
+            with lock:
                 seg = _AudioSegment.from_file(io.BytesIO(audio_bytes), format="mp3")
                 seg = seg.set_channels(1).set_frame_rate(22050)
                 pcm = _np.frombuffer(seg.raw_data, dtype=_np.int16).astype(_np.float32) / 32768.0
@@ -403,17 +534,45 @@ def _edge_tts_speak(text: str, lang: str = "en") -> bool:
     try:
         voice = _select_voice(text, lang)
 
-        cached = _cache_get(text, voice)
-        if cached:
-            return _play_mp3_bytes(cached)
+        # Serialize network generation and playback. The previous implementation
+        # fetched replies concurrently, then let them pile up behind playback.
+        with _play_lock:
+            _stop_flag.clear()
+            cached = _cache_get(text, voice)
+            if cached:
+                if _FFPLAY_PATH and _play_mp3_ffplay(cached):
+                    return True
+                if _stop_flag.is_set():
+                    return True
+                return _play_mp3_bytes(cached, acquire_lock=False)
 
-        loop = asyncio.new_event_loop()
-        audio_bytes = loop.run_until_complete(_stream_to_bytes(text, voice))
-        loop.close()
-        if not audio_bytes:
-            return False
-        _cache_put(text, voice, audio_bytes)
-        return _play_mp3_bytes(audio_bytes)
+            loop = asyncio.new_event_loop()
+            try:
+                streaming_enabled = os.getenv("JARVIS_TTS_STREAMING", "false").lower() in {
+                    "1", "true", "yes", "on"
+                }
+                if _FFPLAY_PATH and streaming_enabled:
+                    played, audio_bytes = loop.run_until_complete(
+                        _stream_edge_to_ffplay(text, voice)
+                    )
+                else:
+                    played = False
+                    audio_bytes = loop.run_until_complete(_stream_to_bytes(text, voice))
+            finally:
+                loop.close()
+
+            if _stop_flag.is_set():
+                return True
+            if not audio_bytes:
+                return False
+            _cache_put(text, voice, audio_bytes)
+            if played:
+                return True
+            # Feeding a complete MP3 to ffplay is slightly slower to begin but
+            # prevents audible gaps on variable network connections.
+            if _FFPLAY_PATH and _play_mp3_ffplay(audio_bytes):
+                return True
+            return _play_mp3_bytes(audio_bytes, acquire_lock=False)
     except Exception as exc:
         LOGGER.warning("edge-tts speak failed: %s", exc)
         return False
@@ -492,6 +651,7 @@ def speak_fast(text: str, lang: str = "en", interrupt: bool = False) -> None:
 def stop_speaking() -> None:
     """Stop all current speech immediately."""
     _stop_flag.set()
+    _terminate_ffplay()
     if _PCM_PLAY:
         try:
             _sd.stop()

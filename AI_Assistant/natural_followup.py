@@ -30,7 +30,7 @@ class NaturalFollowupHandler:
         },
         "continuation": {
             "patterns": [
-                r"^(?:and|also|what about|how about|what's?)(?:\s+(?:the|a)?)",
+                r"^(?:and|also|what about|how about)(?:\s+(?:the|a)?)",
                 r"^(?:same|ditto|me too|both|either)",
             ],
             "action": "continue_topic"
@@ -140,7 +140,7 @@ class NaturalFollowupHandler:
         # Only treat very short queries as implicit follow-ups if they are genuinely ambiguous
         # (not standalone commands like "tell me a joke", "play music", etc.)
         SELF_CONTAINED_PATTERNS = re.compile(
-            r"^(tell me a|play|show me|turn|open|close|find|search|set|start|stop|pause|resume|calculate|what time|what date|remind|book|call|text|email)",
+            r"^(tell me|play|show(?: me)?|turn|switch|open|close|find|search|set|start|stop|pause|resume|calculate|what(?:'s| is| are| time| date)|who|when|where|why|how|remind|book|call|text|email)",
             re.IGNORECASE
         )
         if len(text.split()) <= 5 and not SELF_CONTAINED_PATTERNS.match(text.strip()):

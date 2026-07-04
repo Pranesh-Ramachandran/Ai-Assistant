@@ -176,7 +176,7 @@
 <body>
 <div id="app">
   <!-- Offline / server status banner -->
-  <div id="offline-banner">⚠ JARVIS server offline — start jarvis_grid_server.py to enable AI features</div>
+  <div id="offline-banner">⚠ Reconnecting to the local JARVIS service…</div>
 
   <header>
     <div class="logo" id="logo">Jarvis</div>
@@ -655,7 +655,34 @@
   </div>
 </div>
 <script>
-const API = 'http://localhost:7890';
+const API = window.location.origin;
+const _tokenFromUrl = new URLSearchParams(window.location.search).get('token') || '';
+if (_tokenFromUrl) {
+  sessionStorage.setItem('jarvis_api_token', _tokenFromUrl);
+  history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+}
+const JARVIS_API_TOKEN = _tokenFromUrl || sessionStorage.getItem('jarvis_api_token') || '';
+const _nativeFetch = window.fetch.bind(window);
+window.fetch = async (input, init = {}) => {
+  const requestUrl = typeof input === 'string' ? input : input.url;
+  const options = {...init};
+  if (requestUrl.startsWith(API) && JARVIS_API_TOKEN) {
+    const headers = new Headers(options.headers || {});
+    headers.set('X-Jarvis-Token', JARVIS_API_TOKEN);
+    options.headers = headers;
+  }
+  let response = await _nativeFetch(input, options);
+  if (response.status === 409 && options.body) {
+    const detail = await response.clone().json().catch(() => ({}));
+    if (detail.needs_confirm && detail.confirmation_token && window.confirm('Confirm this sensitive action?')) {
+      const body = JSON.parse(options.body);
+      body.confirmation_token = detail.confirmation_token;
+      options.body = JSON.stringify(body);
+      response = await _nativeFetch(input, options);
+    }
+  }
+  return response;
+};
 const views = { chat:'v-chat', system:'v-system', voice:'v-voice', games:'v-games', booking:'v-booking', calendar:'v-calendar', memory:'v-memory', smarthome:'v-smarthome', desktop:'v-desktop', vision:'v-vision', messages:'v-messages' };
 let wakeOn = false, busy = false, micActive = false;
 let speechWatchdog = null;
@@ -1302,7 +1329,8 @@ document.addEventListener('keydown', e => {
 // SSE — auto-reconnect with exponential backoff
 let _sseRetryDelay = 2000;
 function _connectSSE() {
-  const es = new EventSource(`${API}/api/events`);
+  const eventUrl = `${API}/api/events${JARVIS_API_TOKEN ? `?token=${encodeURIComponent(JARVIS_API_TOKEN)}` : ''}`;
+  const es = new EventSource(eventUrl);
   es.addEventListener('tts_start', () => { setState('speaking'); busy = true; armSpeechWatchdog(6000); });
   es.addEventListener('tts_done',  () => { clearSpeechWatchdog(); setState('idle'); busy = false; });
   es.addEventListener('wake', d => {
@@ -1312,10 +1340,25 @@ function _connectSSE() {
         setState('wake');                                    // cyan ripple burst
         setTimeout(() => setState('listening'), 1200);      // then go blue
         busy = true;
+        // Backend normally ends this with stt/reply/wake_done. This prevents a
+        // dropped SSE event from leaving the display blue forever.
+        setTimeout(() => {
+          if (tgtState === 'listening' || tgtState === 'wake') {
+            setState('idle');
+            busy = false;
+          }
+        }, 12000);
       }
     } catch{}
   });
-  es.addEventListener('stt', d => { try { const p = JSON.parse(d.data); if (p.text) addMsg('user', p.text); } catch{} });
+  es.addEventListener('stt', d => {
+    try {
+      const p = JSON.parse(d.data);
+      if (p.text) addMsg('user', p.text);
+      else if (p.error) { setState('idle'); busy = false; }
+    } catch{}
+  });
+  es.addEventListener('wake_done', () => { setState('idle'); busy = false; });
   es.addEventListener('reply', d => {
     try {
       const p = JSON.parse(d.data);
@@ -1344,23 +1387,31 @@ window.addEventListener('DOMContentLoaded', () => {
   _connectSSE();
 });
 
-// SERVER STATUS CHECK — show offline banner if server unreachable
+// SERVER STATUS CHECK — tolerate brief WebView/network hiccups before warning.
+let serverHealthFailures = 0;
 async function checkServerStatus() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const r = await fetch(`${API}/api/status`, { method:'POST', body:'{}', headers:{'Content-Type':'application/json'} });
-    const d = await r.json();
+    const r = await fetch(`${API}/health/ready`, {
+      method:'GET', cache:'no-store', signal:controller.signal
+    });
+    if (!r.ok) throw new Error(`Health check returned ${r.status}`);
+    serverHealthFailures = 0;
     document.getElementById('offline-banner').classList.remove('show');
-    // Sync wake state on load
-    if (typeof d.wake_active === 'boolean') setWakeWordUi(d.wake_active);
-    // Update version in footer
-    if (d.ai_mode) document.getElementById('fver').textContent = `v2.1 · ${d.ai_mode}`;
   } catch {
-    document.getElementById('offline-banner').classList.add('show');
+    serverHealthFailures += 1;
+    // One dropped keep-alive request does not mean the service is offline.
+    if (serverHealthFailures >= 3) {
+      document.getElementById('offline-banner').classList.add('show');
+    }
+  } finally {
+    clearTimeout(timeout);
   }
 }
-setTimeout(checkServerStatus, 2000);
-// Re-check every 30s
-setInterval(checkServerStatus, 30000);
+checkServerStatus();
+// Recover quickly while still avoiding noisy polling.
+setInterval(checkServerStatus, 10000);
 
 // SYSTEM
 async function loadSystemStats(){

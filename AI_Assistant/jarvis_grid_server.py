@@ -10,18 +10,8 @@ Endpoints:
   POST /api/system        — system info (battery, cpu, ram, wifi)
   POST /api/wake          — start/stop wake word listener
 """
-import sys, os, json, threading, time, re, glob, logging
-
-# ── Logging Setup ─────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler(os.path.join(os.path.dirname(__file__), "server.log")),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger("JARVIS")
+import sys, os, json, threading, time, re, glob, logging, hmac, signal, uuid
+from logging.handlers import RotatingFileHandler
 
 # ── Load Environment Variables ────────────────────────────────────────────────
 env_path = os.path.join(os.path.dirname(__file__), "jarvis.env")
@@ -31,10 +21,28 @@ if os.path.exists(env_path):
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 key, val = line.split("=", 1)
-                os.environ[key.strip()] = val.strip()
-    logger.info(f"Loaded environment variables from jarvis.env")
+                # Deployment environment takes precedence over the local file.
+                os.environ.setdefault(key.strip(), val.strip())
+
+# ── Privacy-aware rotating logging ───────────────────────────────────────────
+_log_file = os.path.join(os.path.dirname(__file__), "server.log")
+_file_handler = RotatingFileHandler(
+    _log_file,
+    maxBytes=max(1, int(os.getenv("JARVIS_LOG_MAX_MB", "5"))) * 1024 * 1024,
+    backupCount=max(1, int(os.getenv("JARVIS_LOG_BACKUPS", "3"))),
+    encoding="utf-8",
+)
+logging.basicConfig(
+    level=getattr(logging, os.getenv("JARVIS_LOG_LEVEL", "INFO").upper(), logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(name)s %(message)s",
+    handlers=[_file_handler, logging.StreamHandler(sys.stdout)],
+    force=True,
+)
+logger = logging.getLogger("JARVIS")
+if os.path.exists(env_path):
+    logger.info("Loaded environment variables from jarvis.env")
 else:
-    logger.warning("jarvis.env not found!")
+    logger.warning("jarvis.env not found")
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -45,13 +53,25 @@ for _f in glob.glob(os.path.join(os.path.dirname(__file__), "tmp*.json")):
     except Exception:
         pass
 
-from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import SimpleHTTPRequestHandler
 from urllib.parse import urlparse
 import base64
+from production_runtime import (
+    BoundedThreadingHTTPServer,
+    ConfirmationGuard,
+    Metrics,
+    ServerConfig,
+    redacted_text,
+    validate_payload,
+)
 
 UI_DIR = os.path.join(os.path.dirname(__file__), "neural_grid_ui")
-HOST   = "localhost"
-PORT   = 7890
+CONFIG = ServerConfig.from_env()
+HOST   = CONFIG.host
+PORT   = CONFIG.port
+METRICS = Metrics()
+CONFIRMATIONS = ConfirmationGuard(CONFIG.require_confirmation)
+_shutdown_event = threading.Event()
 
 # ── AI Brain ──────────────────────────────────────────────────────────────────
 try:
@@ -93,6 +113,9 @@ def _on_tts_ended():
     # Always reset speaking flag first so it can't get stuck
     with _tts_lock:
         _tts_speaking = False
+    if not PASSIVE_FOLLOWUP_ENABLED:
+        return
+
     try:
         _push_event("tts_done", {})
     except Exception as e:
@@ -141,10 +164,15 @@ def _passive_listen_monitor():
             transcript = stt_listen()
             
             if transcript:
-                print(f"[Passive] Recognized: {transcript}")
+                if _is_wake_only(transcript):
+                    print("[Passive] Wake phrase heard; waiting for the actual command")
+                    _push_event("wake", {"state": "listening"})
+                    _auto_listen_respond()
+                    return
+                logger.info("Passive transcript %s", redacted_text(transcript, CONFIG.log_transcripts))
                 _push_event("stt", {"text": transcript})
                 reply = _clean_ai_text(ai_ask(transcript))
-                print(f"[JARVIS] {reply}")
+                logger.info("Passive reply %s", redacted_text(reply, CONFIG.log_transcripts))
                 _push_event("reply", {"text": reply})
                 if TTS_READY and reply:
                     _speak_tracked(reply)
@@ -160,7 +188,7 @@ _tts_queue: _queue.Queue = _queue.Queue(maxsize=2)
 
 def _tts_worker_loop():
     """Dedicated daemon thread: drains TTS queue so HTTP threads never block."""
-    while True:
+    while not _shutdown_event.is_set():
         try:
             text = _tts_queue.get(timeout=1)
             tts_speak(text)
@@ -182,6 +210,7 @@ def _speak_tracked(text):
     if _tts_queue.full():
         try:
             _tts_queue.get_nowait()
+            _tts_queue.task_done()
         except _queue.Empty:
             pass
     try:
@@ -275,6 +304,18 @@ _passive_listen_active = False  # True during passive listening window
 _passive_listen_timer = None    # Timer to end passive listening after 5 seconds
 _passive_listen_lock = threading.Lock()
 PASSIVE_LISTEN_TIMEOUT = 5.0   # Wait 5 seconds after response for user to speak
+PASSIVE_FOLLOWUP_ENABLED = os.getenv("JARVIS_PASSIVE_FOLLOWUP", "false").lower() in {
+    "1", "true", "yes", "on"
+}
+
+_WAKE_ONLY_RE = re.compile(
+    r"^(?:(?:hey|hi|hello|ok|okay)\s+)?(?:jarvis|jarvish|aria|arya)[.!?,\s]*$",
+    re.IGNORECASE,
+)
+
+
+def _is_wake_only(text: str) -> bool:
+    return bool(_WAKE_ONLY_RE.fullmatch((text or "").strip()))
 
 # SSE clients for push events (wake word, voice ID)
 _sse_clients: list = []
@@ -288,7 +329,7 @@ def _init_wake_listener():
         return
     try:
         with _wake_lock:
-            _wake_system = EfficientWakeWordSystem(wake_phrase="aria")
+            _wake_system = EfficientWakeWordSystem(wake_phrase="hey jarvis")
             _wake_system.start(wake_callback=_on_wake_word)
             _wake_active = True
         print("[Wake] Auto-started on server startup")
@@ -322,6 +363,11 @@ def _on_wake_word():
             _wake_system.stop()
 
     time.sleep(0.3)  # let mic release
+    try:
+        import winsound
+        winsound.MessageBeep(winsound.MB_OK)
+    except Exception:
+        pass
     threading.Thread(target=_auto_listen_respond, daemon=True).start()
 
 
@@ -333,22 +379,30 @@ def _auto_listen_respond():
             print("[STT] STT not ready")
             return
         print("[STT] Listening for command...")
-        transcript = stt_listen()
-        print(f"[STT] Transcript: {transcript}")
+        transcript = stt_listen(timeout=8, phrase_limit=7)
+        # If STT captured the wake phrase again, do not send it to the brain.
+        # Give the user one clean command window instead.
+        if _is_wake_only(transcript):
+            print("[STT] Wake phrase repeated; waiting for command...")
+            _push_event("wake", {"state": "listening"})
+            transcript = stt_listen(timeout=8, phrase_limit=7)
+        logger.info("Wake transcript %s", redacted_text(transcript, CONFIG.log_transcripts))
         if not transcript:
             _push_event("stt", {"text": "", "error": "No speech detected"})
+            _push_event("wake_done", {"reason": "no_speech"})
             print("[STT] No speech detected")
             return
         _push_event("stt", {"text": transcript})
         
-        print(f"[AI] Processing: {transcript}")
+        logger.info("Wake AI input %s", redacted_text(transcript, CONFIG.log_transcripts))
         reply = _clean_ai_text(ai_ask(transcript))
-        print(f"[JARVIS] {reply}")
+        logger.info("Wake reply %s", redacted_text(reply, CONFIG.log_transcripts))
         _push_event("reply", {"text": reply})
         
         if TTS_READY and reply:
             _speak_tracked(reply)
     except Exception as e:
+        _push_event("wake_done", {"reason": "error"})
         print(f"[ERROR] _auto_listen_respond failed: {e}")
         import traceback
         traceback.print_exc()
@@ -365,7 +419,7 @@ def _auto_listen_respond():
                 
                 time.sleep(0.5)  # Ensure complete thread cleanup
                 try:
-                    _wake_system = EfficientWakeWordSystem(wake_phrase="aria")
+                    _wake_system = EfficientWakeWordSystem(wake_phrase="hey jarvis")
                     _wake_system.start(wake_callback=_on_wake_word)
                 except Exception as e:
                     print(f"[Wake] Failed to restart: {e}")
@@ -378,31 +432,110 @@ def _auto_listen_respond():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class JarvisHandler(SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=UI_DIR, **kwargs)
 
-    def log_message(self, fmt, *args): pass
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(CONFIG.socket_timeout)
+
+    def handle_one_request(self):
+        started = time.monotonic()
+        self._response_status = 500
+        self.request_id = uuid.uuid4().hex[:16]
+        METRICS.request_started()
+        try:
+            super().handle_one_request()
+        finally:
+            path = urlparse(getattr(self, "path", "/unknown")).path
+            METRICS.request_finished(path, self._response_status, time.monotonic() - started)
+
+    def send_response(self, code, message=None):
+        self._response_status = code
+        super().send_response(code, message)
+
+    def log_message(self, fmt, *args):
+        logger.info("http client=%s request_id=%s %s", self.client_address[0], self.request_id, fmt % args)
+
+    def _origin_allowed(self) -> bool:
+        origin = (self.headers.get("Origin") or "").rstrip("/")
+        return not origin or origin in CONFIG.allowed_origins
+
+    def _authenticated(self, *, allow_query: bool = False) -> bool:
+        if not CONFIG.api_token:
+            return True
+        authorization = self.headers.get("Authorization", "")
+        supplied = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+        supplied = supplied or self.headers.get("X-Jarvis-Token", "").strip()
+        if allow_query and not supplied:
+            from urllib.parse import parse_qs
+            supplied = parse_qs(urlparse(self.path).query).get("token", [""])[0]
+        return bool(supplied) and hmac.compare_digest(supplied, CONFIG.api_token)
+
+    def _require_api_access(self, *, allow_query: bool = False) -> bool:
+        if not self._origin_allowed():
+            self._json({"error": "origin not allowed", "request_id": self.request_id}, 403)
+            return False
+        if not self._authenticated(allow_query=allow_query):
+            self._json({"error": "authentication required", "request_id": self.request_id}, 401)
+            return False
+        return True
 
     def do_OPTIONS(self):
-        self.send_response(200)
+        if not self._origin_allowed():
+            self._json({"error": "origin not allowed", "request_id": self.request_id}, 403)
+            return
+        self.send_response(204)
         self._cors()
+        self._security_headers()
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def do_GET(self):
+        path = urlparse(self.path).path
+        if path == "/health/live":
+            self._json({"status": "ok", "uptime_seconds": METRICS.snapshot()["uptime_seconds"]})
+            return
+        if path == "/health/ready":
+            remote_without_auth = HOST not in {"localhost", "127.0.0.1", "::1"} and not CONFIG.api_token
+            ready = AI_READY and os.path.isdir(UI_DIR) and not _shutdown_event.is_set() and not remote_without_auth
+            self._json({
+                "status": "ready" if ready else "not_ready",
+                "checks": {
+                    "ai": AI_READY,
+                    "ui": os.path.isdir(UI_DIR),
+                    "shutting_down": _shutdown_event.is_set(),
+                    "remote_authentication": not remote_without_auth,
+                },
+            }, 200 if ready else 503)
+            return
+        if path == "/metrics":
+            if not self._require_api_access():
+                return
+            self._text(METRICS.prometheus(), "text/plain; version=0.0.4")
+            return
         # Server-Sent Events stream for push notifications
-        if self.path == "/api/events":
+        if path == "/api/events":
+            if not self._require_api_access(allow_query=True):
+                return
+            with _sse_lock:
+                if len(_sse_clients) >= CONFIG.max_sse_clients:
+                    self._json({"error": "too many event streams", "request_id": self.request_id}, 503)
+                    return
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Connection", "keep-alive")
             self._cors()
+            self._security_headers()
             self.end_headers()
             with _sse_lock:
                 _sse_clients.append(self)
             # Keep connection alive
             try:
-                while True:
-                    time.sleep(15)
+                while not _shutdown_event.wait(15):
                     self.wfile.write(b": ping\n\n")
                     self.wfile.flush()
             except Exception:
@@ -410,13 +543,43 @@ class JarvisHandler(SimpleHTTPRequestHandler):
                     if self in _sse_clients:
                         _sse_clients.remove(self)
             return
+        if path.startswith("/api/"):
+            self._json({"error": "not found", "request_id": self.request_id}, 404)
+            return
         super().do_GET()
 
     def do_POST(self):
         path = urlparse(self.path).path
-        length  = int(self.headers.get("Content-Length", 0))
-        body    = self.rfile.read(length)
-        payload = json.loads(body or "{}")
+        if not path.startswith("/api/"):
+            self._json({"error": "not found", "request_id": self.request_id}, 404)
+            return
+        if not self._require_api_access():
+            return
+        try:
+            payload = self._read_json()
+        except ValueError as exc:
+            self._json({"error": str(exc), "request_id": self.request_id}, 400)
+            return
+        except TimeoutError:
+            self._json({"error": "request body timed out", "request_id": self.request_id}, 408)
+            return
+
+        confirmed, token = CONFIRMATIONS.check(path, payload)
+        if not confirmed:
+            self._json({
+                "error": "confirmation required",
+                "needs_confirm": True,
+                "confirmation_token": token,
+                "request_id": self.request_id,
+            }, 409)
+            return
+
+        try:
+            self._dispatch_post(path, payload)
+        except Exception as exc:
+            self._internal_error(exc)
+
+    def _dispatch_post(self, path, payload):
 
         if path == "/api/chat":
             self._handle_chat(payload)
@@ -500,7 +663,7 @@ class JarvisHandler(SimpleHTTPRequestHandler):
             self._json({"error": "empty message"}, 400)
             return
         # Log raw input (task example shows leak here if ai_ask returns raw JSON)
-        print(f"[USER ] {message}")
+        logger.info("Chat input %s", redacted_text(message, CONFIG.log_transcripts))
 
         # Intercept wake word commands — LLM just says it's done, doesn't act
         _m = message.lower()
@@ -509,15 +672,15 @@ class JarvisHandler(SimpleHTTPRequestHandler):
                 reply = self._toggle_wake("stop")
             else:
                 reply = self._toggle_wake("start")
-            print(f"[JARVIS] {reply}")
+            logger.info("Chat reply %s", redacted_text(reply, CONFIG.log_transcripts))
             if TTS_READY:
-                threading.Thread(target=_speak_tracked, args=(reply,), daemon=True).start()
+                _speak_tracked(reply)
             self._json({"reply": reply, "wake_active": _wake_active})
             return
 
         reply = _clean_ai_text(ai_ask(message))
         # Safe log - _clean_ai_text strips tool JSON/tags
-        print(f"[JARVIS] {reply}")
+        logger.info("Chat reply %s", redacted_text(reply, CONFIG.log_transcripts))
         if TTS_READY and reply:
             _speak_tracked(reply)   # non-blocking — queued to TTS worker thread
         self._json({"reply": reply})
@@ -537,7 +700,7 @@ class JarvisHandler(SimpleHTTPRequestHandler):
         try:
             with _wake_lock:
                 if not _wake_active:
-                    _wake_system = EfficientWakeWordSystem(wake_phrase="aria")
+                    _wake_system = EfficientWakeWordSystem(wake_phrase="hey jarvis")
                     _wake_system.start(wake_callback=_on_wake_word)
                     _wake_active = True
             _push_event("wake_state", {"active": True})
@@ -552,7 +715,8 @@ class JarvisHandler(SimpleHTTPRequestHandler):
                 _wake_system = None
                 _wake_active = False
             _push_event("wake_state", {"active": False, "error": str(e)})
-            return f"Wake listener failed to start: {e}"
+            logger.exception("Wake listener failed to start")
+            return "Wake listener failed to start. Check the server log for details."
 
     def _handle_listen(self, payload):
         """Record mic → STT → AI → TTS → return all."""
@@ -564,7 +728,7 @@ class JarvisHandler(SimpleHTTPRequestHandler):
             self._json({"transcript": "", "reply": "", "error": "No speech detected"})
             return
         # Log raw input (task example shows leak here if ai_ask returns raw JSON)
-        print(f"[STT  ] {transcript}")
+        logger.info("STT transcript %s", redacted_text(transcript, CONFIG.log_transcripts))
 
         # Intercept wake word commands same as chat
         _m = transcript.lower()
@@ -576,9 +740,9 @@ class JarvisHandler(SimpleHTTPRequestHandler):
         else:
             reply = _clean_ai_text(ai_ask(transcript))
         # Safe log - _clean_ai_text strips tool JSON/tags
-        print(f"[JARVIS] {reply}")
+        logger.info("STT reply %s", redacted_text(reply, CONFIG.log_transcripts))
         if TTS_READY:
-            threading.Thread(target=_speak_tracked, args=(reply,), daemon=True).start()
+            _speak_tracked(reply)
         self._json({"transcript": transcript, "reply": reply, "wake_active": _wake_active})
 
     def _handle_voice_id(self, payload):
@@ -650,10 +814,10 @@ class JarvisHandler(SimpleHTTPRequestHandler):
             else:
                 result = control(payload.get("command", ""))
             if TTS_READY and result:
-                threading.Thread(target=_speak_tracked, args=(result,), daemon=True).start()
+                _speak_tracked(result)
             self._json({"result": result})
         except Exception as e:
-            self._json({"error": str(e)})
+            self._internal_error(e)
 
     def _handle_desktop(self, payload):
         try:
@@ -664,7 +828,7 @@ class JarvisHandler(SimpleHTTPRequestHandler):
             else:                     result = handle(payload.get("command",""))
             self._json({"result": result})
         except Exception as e:
-            self._json({"error": str(e)})
+            self._internal_error(e)
 
     def _handle_vision(self, payload):
         try:
@@ -704,10 +868,10 @@ class JarvisHandler(SimpleHTTPRequestHandler):
                 result = handle(payload.get("command", "what do you see"))
 
             if TTS_READY and result:
-                threading.Thread(target=_speak_tracked, args=(result,), daemon=True).start()
+                _speak_tracked(result)
             self._json({"result": result})
         except Exception as e:
-            self._json({"error": str(e)})
+            self._internal_error(e)
 
     def _handle_callsms(self, payload):
         try:
@@ -729,13 +893,13 @@ class JarvisHandler(SimpleHTTPRequestHandler):
             else:
                 result = handle(payload.get("command",""))
             if TTS_READY and result:
-                threading.Thread(target=_speak_tracked, args=(result,), daemon=True).start()
+                _speak_tracked(result)
             pending = get_pending()
             self._json({"result": result,
                         "needs_confirm": pending is not None,
                         "confirm_prompt": pending.prompt if pending else ""})
         except Exception as e:
-            self._json({"error": str(e)})
+            self._internal_error(e)
 
     def _handle_web(self, payload):
         try:
@@ -756,12 +920,12 @@ class JarvisHandler(SimpleHTTPRequestHandler):
             else:
                 result = handle(payload.get("command",""))
             if TTS_READY and result:
-                threading.Thread(target=_speak_tracked, args=(result,), daemon=True).start()
+                _speak_tracked(result)
             pending = get_pending()
             self._json({"result": result, "needs_confirm": pending is not None,
                         "confirm_prompt": pending.prompt if pending else ""})
         except Exception as e:
-            self._json({"error": str(e)})
+            self._internal_error(e)
 
     def _handle_calendar(self, payload):
         try:
@@ -779,10 +943,10 @@ class JarvisHandler(SimpleHTTPRequestHandler):
                                    int(payload.get("duration", 60)))
             else: result = get_events_today()
             if TTS_READY and payload.get("speak"):
-                threading.Thread(target=_speak_tracked, args=(result,), daemon=True).start()
+                _speak_tracked(result)
             self._json({"result": result, "connected": is_connected()})
         except Exception as e:
-            self._json({"result": f"Calendar error: {e}", "connected": False})
+            self._internal_error(e)
 
     def _handle_maps(self, payload):
         try:
@@ -792,10 +956,10 @@ class JarvisHandler(SimpleHTTPRequestHandler):
                 self._json({"error": "No query"}); return
             result = maps_assistant.handle_location_query(query)
             if TTS_READY:
-                threading.Thread(target=_speak_tracked, args=(result,), daemon=True).start()
+                _speak_tracked(result)
             self._json({"result": result})
         except Exception as e:
-            self._json({"error": str(e)})
+            self._internal_error(e)
 
     def _handle_memory(self, payload):
         try:
@@ -826,7 +990,7 @@ class JarvisHandler(SimpleHTTPRequestHandler):
             else:
                 self._json({"error": "Unknown action"})
         except Exception as e:
-            self._json({"error": str(e)})
+            self._internal_error(e)
 
     def _handle_system(self, payload):
         """Return system stats."""
@@ -860,10 +1024,10 @@ class JarvisHandler(SimpleHTTPRequestHandler):
             else:
                 result = ent.get_random_riddle()
             if TTS_READY:
-                threading.Thread(target=_speak_tracked, args=(result,), daemon=True).start()
+                _speak_tracked(result)
             self._json({"result": result})
         except Exception as e:
-            self._json({"result": f"Game error: {e}"})
+            self._internal_error(e)
 
     def _handle_booking(self, payload):
         try:
@@ -916,7 +1080,7 @@ class JarvisHandler(SimpleHTTPRequestHandler):
                     payload.get("movie", ""), payload.get("theater", ""),
                     payload.get("showtime", ""), seats)
                 if TTS_READY:
-                    threading.Thread(target=_speak_tracked, args=(summary,), daemon=True).start()
+                    _speak_tracked(summary)
                 self._json({"summary": summary, "needs_confirm": True,
                             "confirm_prompt": summary, "source": booking_adapter.source()})
 
@@ -940,11 +1104,11 @@ class JarvisHandler(SimpleHTTPRequestHandler):
                 msg = (f"Opening BookMyShow for {movie} — {showtime} at {theater}. "
                        f"{seats} seat{'s' if seats > 1 else ''}. Complete payment on the site.")
                 if TTS_READY:
-                    threading.Thread(target=_speak_tracked, args=(msg,), daemon=True).start()
+                    _speak_tracked(msg)
                 self._json({"url": url, "result": msg, "open_url": True, "source": source})
 
         except Exception as e:
-            self._json({"error": str(e)})
+            self._internal_error(e)
 
     def _handle_music(self, payload):
         try:
@@ -957,10 +1121,10 @@ class JarvisHandler(SimpleHTTPRequestHandler):
             webbrowser.open(url)
             result = f"Opening YouTube Music for '{query}'."
             if TTS_READY:
-                threading.Thread(target=_speak_tracked, args=(result,), daemon=True).start()
+                _speak_tracked(result)
             self._json({"result": result, "url": url})
         except Exception as e:
-            self._json({"error": str(e)})
+            self._internal_error(e)
 
     def _handle_wake(self, payload):
         """Start or stop wake word listener."""
@@ -983,7 +1147,7 @@ class JarvisHandler(SimpleHTTPRequestHandler):
         try:
             with _wake_lock:
                 if not _wake_active:
-                    _wake_system = EfficientWakeWordSystem(wake_phrase="aria")
+                    _wake_system = EfficientWakeWordSystem(wake_phrase="hey jarvis")
                     _wake_system.start(wake_callback=_on_wake_word)
                     _wake_active = True
 
@@ -997,34 +1161,160 @@ class JarvisHandler(SimpleHTTPRequestHandler):
                         pass
                 _wake_system = None
                 _wake_active = False
-            self._json({"ok": False, "wake_active": False, "error": str(e)})
+            logger.exception("Wake listener API operation failed")
+            self._json({"ok": False, "wake_active": False, "error": "wake listener operation failed"}, 500)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
+    def _read_json(self):
+        raw_length = self.headers.get("Content-Length")
+        if raw_length is None:
+            raise ValueError("Content-Length header is required")
+        try:
+            length = int(raw_length)
+        except ValueError as exc:
+            raise ValueError("invalid Content-Length header") from exc
+        if length < 0 or length > CONFIG.max_body_bytes:
+            self.close_connection = True
+            raise ValueError(f"request body exceeds {CONFIG.max_body_bytes} bytes")
+        content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        if length and content_type != "application/json":
+            raise ValueError("Content-Type must be application/json")
+        try:
+            body = self.rfile.read(length)
+        except OSError as exc:
+            raise TimeoutError from exc
+        try:
+            payload = json.loads(body.decode("utf-8") if body else "{}")
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("malformed JSON body") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("JSON body must be an object")
+        validate_payload(payload, CONFIG.max_text_chars)
+        return payload
+
+    def _internal_error(self, exc):
+        error_id = uuid.uuid4().hex[:12]
+        logger.exception("request failed error_id=%s request_id=%s", error_id, self.request_id, exc_info=exc)
+        self._json({
+            "error": "internal server error",
+            "error_id": error_id,
+            "request_id": self.request_id,
+        }, 500)
+
+    def _security_headers(self):
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(self)")
+        self.send_header("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' http://localhost:* http://127.0.0.1:*; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
+
     def _cors(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = (self.headers.get("Origin") or "").rstrip("/")
+        if origin and origin in CONFIG.allowed_origins:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Jarvis-Token")
+        self.send_header("Access-Control-Max-Age", "600")
 
     def _json(self, data: dict, code: int = 200):
-        body = json.dumps(data).encode()
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self._cors()
+        self._security_headers()
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", len(body))
+        self.send_header("X-Request-ID", getattr(self, "request_id", "unknown"))
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def _text(self, data: str, content_type: str, code: int = 200):
+        body = data.encode("utf-8")
+        self.send_response(code)
+        self._cors()
+        self._security_headers()
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", len(body))
+        self.send_header("X-Request-ID", getattr(self, "request_id", "unknown"))
+        self.end_headers()
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+
+def _shutdown_components():
+    """Stop background components without leaking hardware or DB handles."""
+    global _wake_system, _wake_active, _passive_listen_timer
+    _shutdown_event.set()
+    with _passive_listen_lock:
+        if _passive_listen_timer:
+            _passive_listen_timer.cancel()
+            _passive_listen_timer = None
+    with _wake_lock:
+        if _wake_system:
+            try:
+                _wake_system.stop()
+            except Exception:
+                logger.exception("Failed to stop wake listener")
+            _wake_system = None
+        _wake_active = False
+    try:
+        stop_speaking()
+    except Exception:
+        logger.exception("Failed to stop TTS")
+    with _sse_lock:
+        for client in _sse_clients[:]:
+            try:
+                client.close_connection = True
+                client.connection.shutdown(2)
+            except Exception:
+                pass
+        _sse_clients.clear()
+    try:
+        import jarvis_rate_guard
+        if jarvis_rate_guard._CONN is not None:
+            jarvis_rate_guard._CONN.close()
+            jarvis_rate_guard._CONN = None
+    except Exception:
+        logger.exception("Failed to close quota database")
+
+
+def run_server():
+    server = BoundedThreadingHTTPServer(
+        (HOST, PORT), JarvisHandler, max_workers=CONFIG.max_workers, metrics=METRICS
+    )
+
+    def request_shutdown(signum=None, frame=None):
+        logger.info("Shutdown requested signal=%s", signum)
+        _shutdown_event.set()
+        threading.Thread(target=server.shutdown, daemon=True, name="jarvis-shutdown").start()
+
+    for sig_name in ("SIGINT", "SIGTERM"):
+        sig = getattr(signal, sig_name, None)
+        if sig is not None:
+            signal.signal(sig, request_shutdown)
+
+    logger.info("Neural Grid running at http://%s:%s workers=%s", HOST, PORT, CONFIG.max_workers)
+    logger.info(
+        "Components AI=%s TTS=%s STT=%s VoiceID=%s System=%s Wake=%s authentication=%s",
+        AI_READY, TTS_READY, STT_READY, VOICE_ID_READY, SYSTEM_READY, WAKE_READY,
+        "enabled" if CONFIG.api_token else "disabled",
+    )
+    _init_wake_listener()
+    try:
+        server.serve_forever(poll_interval=0.5)
+    except KeyboardInterrupt:
+        request_shutdown(signal.SIGINT, None)
+    finally:
+        _shutdown_components()
+        server.server_close()
+        logger.info("JARVIS shutdown complete")
 
 
 if __name__ == "__main__":
-    server = ThreadingHTTPServer((HOST, PORT), JarvisHandler)
-    print(f"[JARVIS] Neural Grid running → http://{HOST}:{PORT}")
-    print(f"  AI:{' OK' if AI_READY else ' --'}  TTS:{' OK' if TTS_READY else ' --'}  STT:{' OK' if STT_READY else ' --'}  VoiceID:{' OK' if VOICE_ID_READY else ' --'}  System:{' OK' if SYSTEM_READY else ' --'}  Wake:{' OK' if WAKE_READY else ' --'}")
-    
-    # Auto-start wake word listener
-    _init_wake_listener()
-    
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n[JARVIS] Shutting down.")
+    run_server()
